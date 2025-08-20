@@ -95,7 +95,8 @@ describe('Jobber Connection Management', () => {
     
     await connectPromise;
     
-    expect(io).toHaveBeenCalledWith('ws://localhost:3000', {
+    expect(io).toHaveBeenCalledWith('http://localhost:3000', {
+      path: '/ws',
       auth: { customerToken: 'test-token' },
       transports: ['websocket']
     });
@@ -334,7 +335,7 @@ describe('Jobber Work Registration', () => {
     await new Promise(resolve => setImmediate(resolve));
     
     expect(handler).toHaveBeenCalledWith(mockJob);
-    expect(mockSocket.emit).toHaveBeenCalledWith('job_started', { jobId: 'job-123' });
+    expect(mockSocket.emit).toHaveBeenCalledWith('job_started', { jobName: 'test-job', jobId: 'job-123' });
     expect(mockSocket.emit).toHaveBeenCalledWith('job_completed', {
       jobId: 'job-123',
       result: { success: true }

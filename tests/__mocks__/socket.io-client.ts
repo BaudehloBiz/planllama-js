@@ -58,6 +58,7 @@ export class MockSocketInstance extends EventEmitter implements MockSocket {
     this.disconnected = false;
     // Use the original EventEmitter emit for event emission
     super.emit('connect');
+    super.emit('client_ready', { id: "id", customerId: "customerId" });
   }
 
   // Simulate disconnection

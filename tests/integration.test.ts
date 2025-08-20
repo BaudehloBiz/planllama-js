@@ -89,8 +89,9 @@ describe('Jobber Integration Tests', () => {
     expect(completedJobs[0]?.id).toBe('email-job-123');
     
     // Verify server communication
-    expect(mockSocket.emit).toHaveBeenCalledWith('job_started', { jobId: 'email-job-123' });
+    expect(mockSocket.emit).toHaveBeenCalledWith('job_started', { jobName: 'send-email', jobId: 'email-job-123' });
     expect(mockSocket.emit).toHaveBeenCalledWith('job_completed', {
+      jobName: 'send-email',
       jobId: 'email-job-123',
       result: expect.objectContaining({
         status: 'sent',

@@ -285,7 +285,7 @@ describe('Jobber Error Handling and Edge Cases', () => {
       await new Promise(resolve => setImmediate(resolve));
       
       // Should handle without stack overflow
-      expect(mockSocket.emit).toHaveBeenCalledWith('job_started', { jobId: 'deep-nested-123' });
+      expect(mockSocket.emit).toHaveBeenCalledWith('job_started', { jobName: 'deep-nested-job', jobId: 'deep-nested-123' });
     });
   });
 
