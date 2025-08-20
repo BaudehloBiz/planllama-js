@@ -1,0 +1,40 @@
+{
+  "name": "jobber",
+  "version": "1.0.0",
+  "description": "A simple and powerful job scheduler for Node.js applications without requiring a database connection",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "example": "npm run build && node dist/example.js",
+    "lint": "npx @biomejs/biome check .",
+    "lint:fix": "npx @biomejs/biome check . --write",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:ci": "jest --coverage --watchAll=false"
+  },
+  "keywords": [
+    "jobs",
+    "queue",
+    "scheduler",
+    "background",
+    "tasks",
+    "socket.io"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@biomejs/biome": "2.1.4",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.1"
+  }
+}
