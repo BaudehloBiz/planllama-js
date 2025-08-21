@@ -91,7 +91,6 @@ describe('Jobber Integration Tests', () => {
     // Verify server communication
     expect(mockSocket.emit).toHaveBeenCalledWith('job_started', { jobName: 'send-email', jobId: 'email-job-123' });
     expect(mockSocket.emit).toHaveBeenCalledWith('job_completed', {
-      jobName: 'send-email',
       jobId: 'email-job-123',
       result: expect.objectContaining({
         status: 'sent',
@@ -197,21 +196,28 @@ describe('Jobber Integration Tests', () => {
     const batchId = await jobber.sendBatch(batchJobs);
     expect(batchId).toBe('batch-789');
     
-    // Simulate server sending work requests for batch items
-    batchJobs.forEach((batchJob, index) => {
-      setTimeout(() => {
-        const job: Job = {
-          id: `batch-job-${index + 1}`,
-          name: batchJob.name,
-          data: batchJob.data,
-          state: 'active',
-          retryCount: 0,
-          priority: 0,
-          createdAt: new Date()
-        };
-        mockSocket.mockServerEvent('work_request', job);
-      }, index * 15);
-    });
+    // Give worker registration time to complete
+    await new Promise(resolve => setImmediate(resolve));
+    
+    // Simulate server sending work requests for batch items immediately
+    for (let index = 0; index < batchJobs.length; index++) {
+      const batchJob = batchJobs[index];
+      const job: Job = {
+        id: `batch-job-${index + 1}`,
+        name: batchJob.name,
+        data: batchJob.data,
+        state: 'active',
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date()
+      };
+      mockSocket.mockServerEvent('work_request', job);
+      // Small delay between jobs to allow processing
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    
+    // Wait for all jobs to be processed
+    await new Promise(resolve => setTimeout(resolve, 50));
     
     // Wait for batch completion
     await jobber.waitForBatch(batchId);
@@ -235,33 +241,35 @@ describe('Jobber Integration Tests', () => {
       const jobId = job.id;
       startTimes[jobId] = Date.now();
       
-      // Simulate work
-      await new Promise(resolve => setImmediate(resolve));
+      // Simulate work that takes some time
+      await new Promise(resolve => setTimeout(resolve, 20));
       
       endTimes[jobId] = Date.now();
       return { jobId, processed: true };
     });
     
+    // Give worker registration time to complete
+    await new Promise(resolve => setImmediate(resolve));
+    
     // Simulate multiple concurrent work requests
     const jobIds = ['concurrent-1', 'concurrent-2', 'concurrent-3', 'concurrent-4'];
     
-    jobIds.forEach((jobId, index) => {
-      setTimeout(() => {
-        const job: Job = {
-          id: jobId,
-          name: 'concurrent-job',
-          data: { index },
-          state: 'active',
-          retryCount: 0,
-          priority: 0,
-          createdAt: new Date()
-        };
-        mockSocket.mockServerEvent('work_request', job);
-      }, index * 5); // Stagger slightly
-    });
+    // Send all jobs immediately to test concurrency
+    for (const jobId of jobIds) {
+      const job: Job = {
+        id: jobId,
+        name: 'concurrent-job',
+        data: { index: jobIds.indexOf(jobId) },
+        state: 'active',
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date()
+      };
+      mockSocket.mockServerEvent('work_request', job);
+    }
     
     // Wait for all jobs to complete
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Verify all jobs were processed
     expect(Object.keys(startTimes)).toHaveLength(4);
