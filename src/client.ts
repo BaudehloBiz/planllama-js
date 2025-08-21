@@ -79,8 +79,8 @@ export class Jobber extends EventEmitter {
 	private socket: Socket | null = null;
 	private isStarted = false;
 	private jobHandlers = new Map<string, HandlerInfo>();
-	private reconnectAttempts = 0;
-	private maxReconnectAttempts = 10;
+	// private reconnectAttempts = 0;
+	// private maxReconnectAttempts = 10;
 
 	constructor(customerToken: string);
 	constructor(customerOptions: CustomerOptions);
@@ -128,7 +128,7 @@ export class Jobber extends EventEmitter {
 				clearTimeout(connectionTimeout);
 				console.log("Connected to Jobber server");
 				this.isStarted = true;
-				this.reconnectAttempts = 0;
+				// this.reconnectAttempts = 0;
 				this.setupEventHandlers();
 			});
 
@@ -146,10 +146,10 @@ export class Jobber extends EventEmitter {
 				console.log("Disconnected from Jobber server:", reason);
 				this.isStarted = false;
 
-				if (reason === "io server disconnect") {
-					// Server disconnected us, try to reconnect
-					this.handleReconnection();
-				}
+				// if (reason === "io server disconnect") {
+				// 	// Server disconnected us, try to reconnect
+				// 	this.handleReconnection();
+				// }
 			});
 
 			this.socket.on("error", (error) => {
@@ -215,27 +215,27 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
-	private handleReconnection(): void {
-		if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-			console.error("Max reconnection attempts reached");
-			super.emit("error", new Error("Unable to reconnect to server"));
-			return;
-		}
+	// private handleReconnection(): void {
+	// 	if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+	// 		console.error("Max reconnection attempts reached");
+	// 		super.emit("error", new Error("Unable to reconnect to server"));
+	// 		return;
+	// 	}
 
-		this.reconnectAttempts++;
-		const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
+	// 	this.reconnectAttempts++;
+	// 	const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
 
-		console.log(
-			`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`,
-		);
+	// 	console.log(
+	// 		`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`,
+	// 	);
 
-		setTimeout(() => {
-			this.start().catch((error) => {
-				console.error("Reconnection failed:", error);
-				this.handleReconnection();
-			});
-		}, delay);
-	}
+	// 	setTimeout(() => {
+	// 		this.start().catch((error) => {
+	// 			console.error("Reconnection failed:", error);
+	// 			this.handleReconnection();
+	// 		});
+	// 	}, delay);
+	// }
 
 	async stop(): Promise<void> {
 		if (!this.isStarted || !this.socket) {
