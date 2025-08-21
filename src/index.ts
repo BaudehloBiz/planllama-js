@@ -1,2 +1,2 @@
-export * from './client';
-export { Jobber } from './client';
+export * from "./client";
+export { Jobber } from "./client";

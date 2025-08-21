@@ -117,7 +117,7 @@ export class Jobber extends EventEmitter {
 			}, 10000); // 10 second timeout
 
 			this.socket = io(this.serverUrl, {
-				path: '/ws',
+				path: "/ws",
 				auth: {
 					customerToken: this.customerToken,
 				},
@@ -392,7 +392,11 @@ export class Jobber extends EventEmitter {
 				} else if (response.job) {
 					resolve(response.job);
 				} else {
-					reject(new Error(`Invalid response from server: ${JSON.stringify(response)}`));
+					reject(
+						new Error(
+							`Invalid response from server: ${JSON.stringify(response)}`,
+						),
+					);
 				}
 			});
 		});
