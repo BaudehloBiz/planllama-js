@@ -99,6 +99,11 @@ export class Jobber extends EventEmitter {
 		}
 	}
 
+	/**
+	 * Starts the Jobber client and connects to the server.
+	 * @returns {Promise<void>} Resolves when the client is ready.
+	 * @throws {Error} If connection fails or times out.
+	 */
 	async start(): Promise<void> {
 		if (this.isStarted) {
 			return;
@@ -231,6 +236,10 @@ export class Jobber extends EventEmitter {
 	// 	}, delay);
 	// }
 
+	/**
+	 * Stops the Jobber client and disconnects from the server.
+	 * @returns {Promise<void>} Resolves when the client is stopped.
+	 */
 	async stop(): Promise<void> {
 		if (!this.isStarted || !this.socket) {
 			return;
@@ -245,6 +254,15 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Sends a job to the server for processing.
+	 * @template T
+	 * @param {string} name - The name of the job.
+	 * @param {T} data - The job data.
+	 * @param {JobOptions} [options] - Optional job configuration.
+	 * @returns {Promise<string>} Resolves with the job ID.
+	 * @throws {Error} If the client is not started or server returns an error.
+	 */
 	async send<T = unknown>(
 		name: string,
 		data: T,
@@ -271,6 +289,16 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Schedules a recurring job using a cron pattern.
+	 * @template T
+	 * @param {string} name - The name of the job.
+	 * @param {string} cronPattern - The cron pattern for scheduling.
+	 * @param {T} data - The job data.
+	 * @param {JobOptions} [options] - Optional job configuration.
+	 * @returns {Promise<void>} Resolves when the job is scheduled.
+	 * @throws {Error} If the client is not started or server returns an error.
+	 */
 	async schedule<T = unknown>(
 		name: string,
 		cronPattern: string,
@@ -298,6 +326,14 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Registers a job handler for processing jobs of a given name.
+	 * @template T, R
+	 * @param {string} name - The name of the job to handle.
+	 * @param {WorkOptions|JobHandler<T, R>} optionsOrHandler - Work options or the handler function.
+	 * @param {JobHandler<T, R>} [handler] - The handler function (if options are provided).
+	 * @throws {Error} If no handler function is provided.
+	 */
 	work<T = unknown, R = unknown>(name: string, handler: JobHandler<T, R>): void;
 	work<T = unknown, R = unknown>(
 		name: string,
@@ -336,6 +372,12 @@ export class Jobber extends EventEmitter {
 		}
 	}
 
+	/**
+	 * Sends a batch of jobs to the server for processing.
+	 * @param {BatchJob[]} jobs - Array of jobs to send in batch.
+	 * @returns {Promise<string>} Resolves with the batch ID.
+	 * @throws {Error} If the client is not started or server returns an error.
+	 */
 	async sendBatch(jobs: BatchJob[]): Promise<string> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
@@ -354,6 +396,12 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Waits for a batch of jobs to complete.
+	 * @param {string} batchId - The batch ID to wait for.
+	 * @returns {Promise<void>} Resolves when the batch is complete.
+	 * @throws {Error} If the client is not started or server returns an error.
+	 */
 	async waitForBatch(batchId: string): Promise<void> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
@@ -374,6 +422,13 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Retrieves a job by its ID.
+	 * @template T
+	 * @param {string} jobId - The job ID to retrieve.
+	 * @returns {Promise<Job<T>|undefined>} Resolves with the job or undefined if not found.
+	 * @throws {Error} If the client is not started or server returns an error.
+	 */
 	async getJobById<T = unknown>(jobId: string): Promise<Job<T> | undefined> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
@@ -396,6 +451,12 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Cancels a job by its ID.
+	 * @param {string} jobId - The job ID to cancel.
+	 * @returns {Promise<void>} Resolves when the job is cancelled.
+	 * @throws {Error} If the client is not started or server returns an error.
+	 */
 	async cancel(jobId: string): Promise<void> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
@@ -412,6 +473,12 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
+	/**
+	 * Gets the size of the job queue for a given job name.
+	 * @param {string} jobName - The name of the job queue.
+	 * @returns {Promise<number>} Resolves with the queue size.
+	 * @throws {Error} If the client is not started or server returns an error.
+	 */
 	async getQueueSize(jobName: string): Promise<number> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
