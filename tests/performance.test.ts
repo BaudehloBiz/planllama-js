@@ -285,7 +285,10 @@ describe("Jobber Performance Tests", () => {
 			const jobPromises = jobbers.map((j, index) => {
 				mockSocket.emit.mockImplementation((event, _data, callback) => {
 					if (event === "send_job" && callback) {
-						setTimeout(() => callback({ status: "ok", jobId: `concurrent-${index}` }), 5);
+						setTimeout(
+							() => callback({ status: "ok", jobId: `concurrent-${index}` }),
+							5,
+						);
 					}
 				});
 

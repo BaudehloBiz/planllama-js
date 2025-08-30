@@ -50,7 +50,7 @@ export interface BatchJob<T = unknown> {
 }
 
 interface SocketResponse<T = unknown> {
-	status: 'ok' | 'error';
+	status: "ok" | "error";
 	error?: string;
 	jobId?: string;
 	scheduleId?: string;
@@ -485,15 +485,19 @@ export class Jobber extends EventEmitter {
 		}
 
 		return new Promise((resolve, reject) => {
-			this.socket?.emit("get_queue_size", { jobName }, (response: SocketResponse) => {
-				if (response.status === "error") {
-					reject(new Error(response.error));
-				} else if (response.status === "ok") {
-					resolve(response.queueSize || 0);
-				} else {
-					reject(new Error("Invalid response from server"));
-				}
-			});
+			this.socket?.emit(
+				"get_queue_size",
+				{ jobName },
+				(response: SocketResponse) => {
+					if (response.status === "error") {
+						reject(new Error(response.error));
+					} else if (response.status === "ok") {
+						resolve(response.queueSize || 0);
+					} else {
+						reject(new Error("Invalid response from server"));
+					}
+				},
+			);
 		});
 	}
 }

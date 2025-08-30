@@ -255,11 +255,7 @@ describe("Jobber Job Scheduling", () => {
 			}
 		});
 
-		await jobber.schedule(
-			"daily-report",
-			cronPattern,
-			jobData,
-		);
+		await jobber.schedule("daily-report", cronPattern, jobData);
 
 		expect(mockSocket.emit).toHaveBeenCalledWith(
 			"schedule_job",
