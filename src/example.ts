@@ -114,7 +114,7 @@ async function main() {
 		console.log("Batch sent:", batchId);
 
 		// Get queue statistics
-		const queueSize = await jobber.getQueueSize();
+		const queueSize = await jobber.getQueueSize("send-email");
 		console.log("Queue size:", queueSize);
 
 		// Wait a bit for jobs to process
@@ -122,7 +122,7 @@ async function main() {
 
 		// Get job details
 		const emailJob = await jobber.getJobById(emailJobId);
-		console.log("Email job status:", emailJob.state);
+		console.log("Email job status:", emailJob?.state);
 	} catch (error) {
 		console.error("Error:", error);
 	}

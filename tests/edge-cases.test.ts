@@ -146,7 +146,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		it("should handle null/undefined job data", async () => {
 			mockSocket.emit.mockImplementation((event, _data, callback) => {
 				if (event === "send_job" && callback) {
-					callback({ jobId: "null-data-job" });
+					callback({ status: "ok", jobId: "null-data-job" });
 				}
 			});
 
@@ -172,7 +172,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 
 			mockSocket.emit.mockImplementation((event, _data, callback) => {
 				if (event === "send_job" && callback) {
-					callback({ jobId: "large-payload-job" });
+					callback({ status: "ok", jobId: "large-payload-job" });
 				}
 			});
 
@@ -187,7 +187,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 
 			mockSocket.emit.mockImplementation((event, _data, callback) => {
 				if (event === "send_job" && callback) {
-					callback({ jobId: "circular-job" });
+					callback({ status: "ok", jobId: "circular-job" });
 				}
 			});
 

@@ -186,7 +186,7 @@ describe("Jobber Job Sending", () => {
 		// Mock successful response
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "send_job" && callback) {
-				callback({ jobId: "job-123" });
+				callback({ status: "ok", jobId: "job-123" });
 			}
 		});
 
@@ -203,7 +203,7 @@ describe("Jobber Job Sending", () => {
 	it("should handle send job error response", async () => {
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "send_job" && callback) {
-				callback({ error: "Job failed" });
+				callback({ status: "error", error: "Job failed" });
 			}
 		});
 
@@ -251,17 +251,16 @@ describe("Jobber Job Scheduling", () => {
 
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "schedule_job" && callback) {
-				callback({ scheduleId: "schedule-456" });
+				callback({ status: "ok" });
 			}
 		});
 
-		const scheduleId = await jobber.schedule(
+		await jobber.schedule(
 			"daily-report",
 			cronPattern,
 			jobData,
 		);
 
-		expect(scheduleId).toBe("schedule-456");
 		expect(mockSocket.emit).toHaveBeenCalledWith(
 			"schedule_job",
 			{ name: "daily-report", cronPattern, data: jobData, options: undefined },
@@ -272,7 +271,7 @@ describe("Jobber Job Scheduling", () => {
 	it("should handle schedule error response", async () => {
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "schedule_job" && callback) {
-				callback({ error: "Invalid cron pattern" });
+				callback({ status: "error", error: "Invalid cron pattern" });
 			}
 		});
 
@@ -448,7 +447,7 @@ describe("Jobber Batch Operations", () => {
 
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "send_batch" && callback) {
-				callback({ batchId: "batch-789" });
+				callback({ status: "ok", batchId: "batch-789" });
 			}
 		});
 
@@ -481,7 +480,7 @@ describe("Jobber Batch Operations", () => {
 	it("should handle batch error", async () => {
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "send_batch" && callback) {
-				callback({ error: "Batch failed" });
+				callback({ status: "error", error: "Batch failed" });
 			}
 		});
 
@@ -516,7 +515,7 @@ describe("Jobber Job Management", () => {
 
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "get_job" && callback) {
-				callback({ job: mockJob });
+				callback({ status: "ok", job: mockJob });
 			}
 		});
 
@@ -533,7 +532,7 @@ describe("Jobber Job Management", () => {
 	it("should cancel job", async () => {
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "cancel_job" && callback) {
-				callback({});
+				callback({ status: "ok" });
 			}
 		});
 
@@ -547,20 +546,20 @@ describe("Jobber Job Management", () => {
 	});
 
 	it("should get queue size", async () => {
-		const queueSize = { waiting: 5, active: 2, completed: 100, failed: 3 };
+		const queueSize = 5;
 
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "get_queue_size" && callback) {
-				callback({ queueSize });
+				callback({ status: "ok", queueSize });
 			}
 		});
 
-		const result = await jobber.getQueueSize();
+		const result = await jobber.getQueueSize("a-queue");
 
 		expect(result).toEqual(queueSize);
 		expect(mockSocket.emit).toHaveBeenCalledWith(
 			"get_queue_size",
-			{},
+			{ jobName: "a-queue" },
 			expect.any(Function),
 		);
 	});
@@ -568,7 +567,7 @@ describe("Jobber Job Management", () => {
 	it("should handle job not found error", async () => {
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "get_job" && callback) {
-				callback({ error: "Job not found" });
+				callback({ status: "error", error: "Job not found" });
 			}
 		});
 

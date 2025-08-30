@@ -50,7 +50,7 @@ describe("Jobber Integration Tests", () => {
 		// Mock server response for job sending
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "send_job" && callback) {
-				callback({ jobId: "email-job-123" });
+				callback({ status: "ok", jobId: "email-job-123" });
 			}
 		});
 
@@ -123,7 +123,7 @@ describe("Jobber Integration Tests", () => {
 		// Send job with retry options
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "send_job" && callback) {
-				callback({ jobId: "flaky-job-456" });
+				callback({ status: "ok", jobId: "flaky-job-456" });
 			}
 		});
 
@@ -187,9 +187,9 @@ describe("Jobber Integration Tests", () => {
 		// Mock batch sending
 		mockSocket.emit.mockImplementation((event, _data, callback) => {
 			if (event === "send_batch" && callback) {
-				callback({ batchId: "batch-789" });
+				callback({ status: "ok", batchId: "batch-789" });
 			} else if (event === "wait_for_batch" && callback) {
-				callback({});
+				callback({}); // TODO: have not implemented yet
 			}
 		});
 

@@ -43,13 +43,6 @@ export interface Job<T = unknown> {
 	failedAt?: Date;
 }
 
-export interface QueueSize {
-	waiting: number;
-	active: number;
-	completed: number;
-	failed: number;
-}
-
 export interface BatchJob<T = unknown> {
 	name: string;
 	data: T;
@@ -57,12 +50,13 @@ export interface BatchJob<T = unknown> {
 }
 
 interface SocketResponse<T = unknown> {
+	status: 'ok' | 'error';
 	error?: string;
 	jobId?: string;
 	scheduleId?: string;
 	batchId?: string;
 	job?: Job<T>;
-	queueSize?: QueueSize;
+	queueSize?: number;
 	result?: T;
 }
 
@@ -265,9 +259,9 @@ export class Jobber extends EventEmitter {
 				"send_job",
 				{ name, data, options },
 				(response: SocketResponse) => {
-					if (response.error) {
+					if (response.status === "error") {
 						reject(new Error(response.error));
-					} else if (response.jobId) {
+					} else if (response.status === "ok" && response.jobId) {
 						resolve(response.jobId);
 					} else {
 						reject(new Error("Invalid response from server"));
@@ -282,7 +276,7 @@ export class Jobber extends EventEmitter {
 		cronPattern: string,
 		data: T,
 		options?: JobOptions,
-	): Promise<string> {
+	): Promise<void> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
 		}
@@ -292,10 +286,10 @@ export class Jobber extends EventEmitter {
 				"schedule_job",
 				{ name, cronPattern, data, options },
 				(response: SocketResponse) => {
-					if (response.error) {
+					if (response.status === "error") {
 						reject(new Error(response.error));
-					} else if (response.scheduleId) {
-						resolve(response.scheduleId);
+					} else if (response.status === "ok") {
+						resolve();
 					} else {
 						reject(new Error("Invalid response from server"));
 					}
@@ -349,9 +343,9 @@ export class Jobber extends EventEmitter {
 
 		return new Promise((resolve, reject) => {
 			this.socket?.emit("send_batch", { jobs }, (response: SocketResponse) => {
-				if (response.error) {
+				if (response.status === "error") {
 					reject(new Error(response.error));
-				} else if (response.batchId) {
+				} else if (response.status === "ok" && response.batchId) {
 					resolve(response.batchId);
 				} else {
 					reject(new Error("Invalid response from server"));
@@ -370,7 +364,7 @@ export class Jobber extends EventEmitter {
 				"wait_for_batch",
 				{ batchId },
 				(response: SocketResponse) => {
-					if (response.error) {
+					if (response.status === "error") {
 						reject(new Error(response.error));
 					} else {
 						resolve();
@@ -380,16 +374,16 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
-	async getJobById<T = unknown>(jobId: string): Promise<Job<T>> {
+	async getJobById<T = unknown>(jobId: string): Promise<Job<T> | undefined> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
 			this.socket?.emit("get_job", { jobId }, (response: SocketResponse<T>) => {
-				if (response.error) {
+				if (response.status === "error") {
 					reject(new Error(response.error));
-				} else if (response.job) {
+				} else if (response.status === "ok") {
 					resolve(response.job);
 				} else {
 					reject(
@@ -409,7 +403,7 @@ export class Jobber extends EventEmitter {
 
 		return new Promise((resolve, reject) => {
 			this.socket?.emit("cancel_job", { jobId }, (response: SocketResponse) => {
-				if (response.error) {
+				if (response.status === "error") {
 					reject(new Error(response.error));
 				} else {
 					resolve();
@@ -418,17 +412,17 @@ export class Jobber extends EventEmitter {
 		});
 	}
 
-	async getQueueSize(): Promise<QueueSize> {
+	async getQueueSize(jobName: string): Promise<number> {
 		if (!this.isStarted || !this.socket) {
 			throw new Error("Jobber not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
-			this.socket?.emit("get_queue_size", {}, (response: SocketResponse) => {
-				if (response.error) {
+			this.socket?.emit("get_queue_size", { jobName }, (response: SocketResponse) => {
+				if (response.status === "error") {
 					reject(new Error(response.error));
-				} else if (response.queueSize) {
-					resolve(response.queueSize);
+				} else if (response.status === "ok") {
+					resolve(response.queueSize || 0);
 				} else {
 					reject(new Error("Invalid response from server"));
 				}

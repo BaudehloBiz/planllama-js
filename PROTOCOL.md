@@ -39,6 +39,7 @@ Send a job to be processed immediately or at a scheduled time.
 
 ```typescript
 {
+  status: RequestStatus;
   jobId?: string;
   error?: string;
 }
@@ -63,6 +64,7 @@ Schedule a recurring job using cron pattern.
 
 ```typescript
 {
+  status: RequestStatus;
   scheduleId?: string;
   error?: string;
 }
@@ -97,6 +99,7 @@ Send multiple jobs as a batch.
 
 ```typescript
 {
+  status: RequestStatus;
   batchId?: string;
   error?: string;
 }
@@ -138,6 +141,7 @@ Get job details by ID.
 
 ```typescript
 {
+  status: RequestStatus;
   job?: Job;
   error?: string;
 }
@@ -159,6 +163,7 @@ Cancel a job.
 
 ```typescript
 {
+  status: RequestStatus;
   error?: string;
 }
 ```
@@ -171,6 +176,7 @@ Get queue statistics.
 
 ```typescript
 {
+  jobName: string;
 }
 ```
 
@@ -178,7 +184,8 @@ Get queue statistics.
 
 ```typescript
 {
-  queueSize?: QueueSize;
+  status: RequestStatus;
+  queueSize?: number;
   error?: string;
 }
 ```
@@ -264,6 +271,15 @@ Job;
 ```
 
 ## Data Types
+
+### Response Status
+
+```typescript
+enum RequestStatus {
+  OK = 'ok',
+  ERROR = 'error',
+}
+```
 
 ### Job
 

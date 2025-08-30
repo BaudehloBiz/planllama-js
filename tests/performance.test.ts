@@ -30,7 +30,7 @@ describe("Jobber Performance Tests", () => {
 			if (event === "send_job" && callback) {
 				const jobId = `job-${sentJobs.length + 1}`;
 				sentJobs.push(jobId);
-				setTimeout(() => callback({ jobId }), 1);
+				setTimeout(() => callback({ status: "ok", jobId }), 1);
 			}
 		});
 
@@ -285,7 +285,7 @@ describe("Jobber Performance Tests", () => {
 			const jobPromises = jobbers.map((j, index) => {
 				mockSocket.emit.mockImplementation((event, _data, callback) => {
 					if (event === "send_job" && callback) {
-						setTimeout(() => callback({ jobId: `concurrent-${index}` }), 5);
+						setTimeout(() => callback({ status: "ok", jobId: `concurrent-${index}` }), 5);
 					}
 				});
 
