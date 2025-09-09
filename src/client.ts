@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { readFile } from "node:fs/promises";
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 
@@ -109,6 +110,12 @@ export class Jobber extends EventEmitter {
 			return;
 		}
 
+		const { version } = JSON.parse(await readFile("package.json", "utf-8")) as {
+			version: string;
+			name: string;
+			description: string;
+		};
+
 		return new Promise((resolve, reject) => {
 			// Set a connection timeout
 			const connectionTimeout = setTimeout(() => {
@@ -120,7 +127,12 @@ export class Jobber extends EventEmitter {
 				auth: {
 					customerToken: this.customerToken,
 				},
-				transports: ["websocket"],
+				transports: ["websocket", "polling"],
+				tryAllTransports: true,
+				withCredentials: true,
+				extraHeaders: {
+					"User-Agent": `planllama-client/${version}`,
+				},
 			});
 
 			this.socket.on("connect", () => {
@@ -137,7 +149,7 @@ export class Jobber extends EventEmitter {
 
 			this.socket.on("connect_error", (error) => {
 				clearTimeout(connectionTimeout);
-				console.error("Failed to connect to Jobber server:", error.message);
+				console.error("Failed to connect to Jobber server:", JSON.stringify(error));
 				reject(new Error(`Failed to connect: ${error.message}`));
 			});
 
