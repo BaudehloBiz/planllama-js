@@ -1,9 +1,9 @@
 import type { Job } from "../src/client";
-import { Jobber } from "../src/client";
+import { PlanLlama } from "../src/client";
 import { mockSocket } from "./__mocks__/socket.io-client";
 
-describe("Jobber Performance Tests", () => {
-	let jobber: Jobber;
+describe("PlanLlama Performance Tests", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
 		jest.clearAllMocks();
@@ -11,14 +11,14 @@ describe("Jobber Performance Tests", () => {
 		mockSocket.connected = false;
 		mockSocket.disconnected = true;
 
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		setTimeout(() => mockSocket.mockConnect(), 10);
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should handle high-volume job sending efficiently", async () => {
@@ -38,7 +38,7 @@ describe("Jobber Performance Tests", () => {
 
 		// Send jobs in parallel
 		const sendPromises = Array.from({ length: jobCount }, (_, index) =>
-			jobber.send("bulk-job", { index }),
+			planLlama.send("bulk-job", { index }),
 		);
 
 		const jobIds = await Promise.all(sendPromises);
@@ -63,7 +63,7 @@ describe("Jobber Performance Tests", () => {
 		const processingTimes: number[] = [];
 
 		// Register fast processor
-		jobber.work("fast-job", async (job) => {
+		planLlama.work("fast-job", async (job) => {
 			const startTime = Date.now();
 
 			// Minimal processing
@@ -130,7 +130,7 @@ describe("Jobber Performance Tests", () => {
 		const processedJobs: string[] = [];
 
 		// Register handler for large data
-		jobber.work("large-data-job", async (job) => {
+		planLlama.work("large-data-job", async (job) => {
 			const { id, data } = job.data as { id: string; data: string };
 
 			// Verify data integrity
@@ -204,15 +204,15 @@ describe("Jobber Performance Tests", () => {
 		// Add multiple event listeners
 		const listenerCount = 10;
 		for (let i = 0; i < listenerCount; i++) {
-			jobber.on("completed", () => eventCounts.completed++);
-			jobber.on("failed", () => eventCounts.failed++);
-			jobber.on("active", () => eventCounts.active++);
-			jobber.on("retrying", () => eventCounts.retrying++);
+			planLlama.on("completed", () => eventCounts.completed++);
+			planLlama.on("failed", () => eventCounts.failed++);
+			planLlama.on("active", () => eventCounts.active++);
+			planLlama.on("retrying", () => eventCounts.retrying++);
 		}
 
 		// Register job handlers
-		jobber.work("success-job", async () => ({ success: true }));
-		jobber.work("fail-job", async () => {
+		planLlama.work("success-job", async () => ({ success: true }));
+		planLlama.work("fail-job", async () => {
 			throw new Error("Intentional failure");
 		});
 
@@ -258,22 +258,22 @@ describe("Jobber Performance Tests", () => {
 
 	it("should handle concurrent connections efficiently", async () => {
 		const connectionCount = 5;
-		const jobbers: Jobber[] = [];
+		const planLlamas: PlanLlama[] = [];
 		const connectTimes: number[] = [];
 
 		try {
 			// Create multiple connections
 			for (let i = 0; i < connectionCount; i++) {
 				const startTime = Date.now();
-				const testJobber = new Jobber(`test-token-${i}`);
+				const testPlanLlama = new PlanLlama(`test-token-${i}`);
 
-				const connectPromise = testJobber.start();
+				const connectPromise = testPlanLlama.start();
 				setTimeout(() => mockSocket.mockConnect(), 10);
 				await connectPromise;
 
 				const endTime = Date.now();
 				connectTimes.push(endTime - startTime);
-				jobbers.push(testJobber);
+				planLlamas.push(testPlanLlama);
 			}
 
 			// Verify all connections established quickly
@@ -282,7 +282,7 @@ describe("Jobber Performance Tests", () => {
 			expect(avgConnectTime).toBeLessThan(100); // Under 100ms average
 
 			// Test concurrent job sending
-			const jobPromises = jobbers.map((j, index) => {
+			const jobPromises = planLlamas.map((j, index) => {
 				mockSocket.emit.mockImplementation((event, _data, callback) => {
 					if (event === "send_job" && callback) {
 						setTimeout(
@@ -299,7 +299,7 @@ describe("Jobber Performance Tests", () => {
 			expect(jobIds).toHaveLength(connectionCount);
 		} finally {
 			// Clean up connections
-			await Promise.all(jobbers.map((j) => j.stop()));
+			await Promise.all(planLlamas.map((j) => j.stop()));
 		}
 	});
 });

@@ -4,7 +4,7 @@ import type {
 	JobOptions,
 	WorkOptions,
 } from "../src/client";
-import { Jobber } from "../src/client";
+import { PlanLlama } from "../src/client";
 import { io, mockSocket } from "./__mocks__/socket.io-client";
 
 // Reset mocks before each test
@@ -38,10 +38,10 @@ beforeEach(() => {
 	);
 });
 
-describe("Jobber Constructor", () => {
+describe("PlanLlama Constructor", () => {
 	it("should create instance with string token", () => {
-		const jobber = new Jobber("test-token");
-		expect(jobber).toBeInstanceOf(Jobber);
+		const planLlama = new PlanLlama("test-token");
+		expect(planLlama).toBeInstanceOf(PlanLlama);
 	});
 
 	it("should create instance with options object", () => {
@@ -49,46 +49,46 @@ describe("Jobber Constructor", () => {
 			customerToken: "test-token",
 			serverUrl: "ws://custom.example.com",
 		};
-		const jobber = new Jobber(options);
-		expect(jobber).toBeInstanceOf(Jobber);
+		const planLlama = new PlanLlama(options);
+		expect(planLlama).toBeInstanceOf(PlanLlama);
 	});
 
 	it("should throw error for empty token string", () => {
-		expect(() => new Jobber("")).toThrow("Customer token is required");
+		expect(() => new PlanLlama("")).toThrow("Customer token is required");
 	});
 
 	it("should throw error for invalid options", () => {
-		expect(() => new Jobber({} as CustomerOptions)).toThrow(
+		expect(() => new PlanLlama({} as CustomerOptions)).toThrow(
 			"Customer options with token are required",
 		);
 	});
 
 	it("should use default server URL when not provided", () => {
-		const jobber = new Jobber("test-token");
+		const planLlama = new PlanLlama("test-token");
 		// We can't directly test the private serverUrl, but we can verify the behavior
-		expect(jobber).toBeInstanceOf(Jobber);
+		expect(planLlama).toBeInstanceOf(PlanLlama);
 	});
 
 	it("should use custom server URL when provided", () => {
-		const jobber = new Jobber({
+		const planLlama = new PlanLlama({
 			customerToken: "test-token",
 			serverUrl: "ws://custom.example.com",
 		});
-		expect(jobber).toBeInstanceOf(Jobber);
+		expect(planLlama).toBeInstanceOf(PlanLlama);
 	});
 });
 
-describe("Jobber Connection Management", () => {
-	let jobber: Jobber;
+describe("PlanLlama Connection Management", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(() => {
-		jobber = new Jobber("test-token");
+		planLlama = new PlanLlama("test-token");
 	});
 
 	afterEach(async () => {
-		if (jobber) {
+		if (planLlama) {
 			try {
-				await jobber.stop();
+				await planLlama.stop();
 			} catch (_error) {
 				// Ignore cleanup errors
 			}
@@ -99,7 +99,7 @@ describe("Jobber Connection Management", () => {
 	});
 
 	it("should connect to server successfully", async () => {
-		const connectPromise = jobber.start();
+		const connectPromise = planLlama.start();
 
 		// Simulate successful connection immediately
 		mockSocket.mockConnect();
@@ -114,7 +114,7 @@ describe("Jobber Connection Management", () => {
 	});
 
 	it("should handle connection errors", async () => {
-		const connectPromise = jobber.start();
+		const connectPromise = planLlama.start();
 
 		// Simulate connection error immediately
 		mockSocket.mockConnectError(new Error("Connection failed"));
@@ -126,23 +126,23 @@ describe("Jobber Connection Management", () => {
 
 	it("should not connect twice if already connected", async () => {
 		// First connection
-		const connectPromise1 = jobber.start();
+		const connectPromise1 = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise1;
 
 		// Second connection attempt should return immediately
-		await jobber.start();
+		await planLlama.start();
 
 		expect(io).toHaveBeenCalledTimes(1);
 	});
 
 	it("should handle disconnect and emit error on reconnection failure", async () => {
-		const connectPromise = jobber.start();
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 
 		const errorHandler = jest.fn();
-		jobber.on("error", errorHandler);
+		planLlama.on("error", errorHandler);
 
 		// Simulate server disconnect
 		mockSocket.mockDisconnect("io server disconnect");
@@ -151,32 +151,32 @@ describe("Jobber Connection Management", () => {
 	});
 
 	it("should stop gracefully", async () => {
-		const connectPromise = jobber.start();
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 
-		await jobber.stop();
+		await planLlama.stop();
 
 		expect(mockSocket.disconnect).toHaveBeenCalled();
 	});
 
 	it("should handle stop when not connected", async () => {
-		await expect(jobber.stop()).resolves.toBeUndefined();
+		await expect(planLlama.stop()).resolves.toBeUndefined();
 	});
 });
 
-describe("Jobber Job Sending", () => {
-	let jobber: Jobber;
+describe("PlanLlama Job Sending", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should send job successfully", async () => {
@@ -190,7 +190,7 @@ describe("Jobber Job Sending", () => {
 			}
 		});
 
-		const jobId = await jobber.send("test-job", jobData, options);
+		const jobId = await planLlama.send("test-job", jobData, options);
 
 		expect(jobId).toBe("job-123");
 		expect(mockSocket.emit).toHaveBeenCalledWith(
@@ -207,7 +207,7 @@ describe("Jobber Job Sending", () => {
 			}
 		});
 
-		await expect(jobber.send("test-job", {})).rejects.toThrow("Job failed");
+		await expect(planLlama.send("test-job", {})).rejects.toThrow("Job failed");
 	});
 
 	it("should handle invalid response from server", async () => {
@@ -217,32 +217,32 @@ describe("Jobber Job Sending", () => {
 			}
 		});
 
-		await expect(jobber.send("test-job", {})).rejects.toThrow(
+		await expect(planLlama.send("test-job", {})).rejects.toThrow(
 			"Invalid response from server",
 		);
 	});
 
 	it("should throw error when not connected", async () => {
-		await jobber.stop();
+		await planLlama.stop();
 
-		await expect(jobber.send("test-job", {})).rejects.toThrow(
-			"Jobber not started. Call start() first.",
+		await expect(planLlama.send("test-job", {})).rejects.toThrow(
+			"PlanLlama not started. Call start() first.",
 		);
 	});
 });
 
-describe("Jobber Job Scheduling", () => {
-	let jobber: Jobber;
+describe("PlanLlama Job Scheduling", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should schedule job successfully", async () => {
@@ -255,7 +255,7 @@ describe("Jobber Job Scheduling", () => {
 			}
 		});
 
-		await jobber.schedule("daily-report", cronPattern, jobData);
+		await planLlama.schedule("daily-report", cronPattern, jobData);
 
 		expect(mockSocket.emit).toHaveBeenCalledWith(
 			"schedule_job",
@@ -271,38 +271,38 @@ describe("Jobber Job Scheduling", () => {
 			}
 		});
 
-		await expect(jobber.schedule("test-job", "invalid", {})).rejects.toThrow(
+		await expect(planLlama.schedule("test-job", "invalid", {})).rejects.toThrow(
 			"Invalid cron pattern",
 		);
 	});
 
 	it("should throw error when not connected", async () => {
-		await jobber.stop();
+		await planLlama.stop();
 
-		await expect(jobber.schedule("test-job", "0 9 * * *", {})).rejects.toThrow(
-			"Jobber not started. Call start() first.",
-		);
+		await expect(
+			planLlama.schedule("test-job", "0 9 * * *", {}),
+		).rejects.toThrow("PlanLlama not started. Call start() first.");
 	});
 });
 
-describe("Jobber Work Registration", () => {
-	let jobber: Jobber;
+describe("PlanLlama Work Registration", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should register worker with handler only", () => {
 		const handler = jest.fn().mockResolvedValue("result");
 
-		jobber.work("test-job", handler);
+		planLlama.work("test-job", handler);
 
 		expect(mockSocket.emit).toHaveBeenCalledWith("register_worker", {
 			jobName: "test-job",
@@ -314,7 +314,7 @@ describe("Jobber Work Registration", () => {
 		const handler = jest.fn().mockResolvedValue("result");
 		const options: WorkOptions = { teamSize: 3, teamConcurrency: 2 };
 
-		jobber.work("test-job", options, handler);
+		planLlama.work("test-job", options, handler);
 
 		expect(mockSocket.emit).toHaveBeenCalledWith("register_worker", {
 			jobName: "test-job",
@@ -327,7 +327,7 @@ describe("Jobber Work Registration", () => {
 
 		expect(() => {
 			// @ts-expect-error - Testing invalid usage
-			jobber.work("test-job", options);
+			planLlama.work("test-job", options);
 		}).toThrow("Handler function is required");
 	});
 
@@ -335,8 +335,8 @@ describe("Jobber Work Registration", () => {
 		const handler = jest.fn().mockResolvedValue({ success: true });
 		const completedHandler = jest.fn();
 
-		jobber.work("test-job", handler);
-		jobber.on("completed", completedHandler);
+		planLlama.work("test-job", handler);
+		planLlama.on("completed", completedHandler);
 
 		const mockJob: Job = {
 			id: "job-123",
@@ -370,8 +370,8 @@ describe("Jobber Work Registration", () => {
 		const handler = jest.fn().mockRejectedValue(new Error("Processing failed"));
 		const failedHandler = jest.fn();
 
-		jobber.work("test-job", handler);
-		jobber.on("failed", failedHandler);
+		planLlama.work("test-job", handler);
+		planLlama.on("failed", failedHandler);
 
 		const mockJob: Job = {
 			id: "job-123",
@@ -421,18 +421,18 @@ describe("Jobber Work Registration", () => {
 	});
 });
 
-describe("Jobber Batch Operations", () => {
-	let jobber: Jobber;
+describe("PlanLlama Batch Operations", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should send batch successfully", async () => {
@@ -447,7 +447,7 @@ describe("Jobber Batch Operations", () => {
 			}
 		});
 
-		const batchId = await jobber.sendBatch(jobs);
+		const batchId = await planLlama.sendBatch(jobs);
 
 		expect(batchId).toBe("batch-789");
 		expect(mockSocket.emit).toHaveBeenCalledWith(
@@ -464,7 +464,7 @@ describe("Jobber Batch Operations", () => {
 			}
 		});
 
-		await expect(jobber.waitForBatch("batch-789")).resolves.toBeUndefined();
+		await expect(planLlama.waitForBatch("batch-789")).resolves.toBeUndefined();
 
 		expect(mockSocket.emit).toHaveBeenCalledWith(
 			"wait_for_batch",
@@ -480,22 +480,22 @@ describe("Jobber Batch Operations", () => {
 			}
 		});
 
-		await expect(jobber.sendBatch([])).rejects.toThrow("Batch failed");
+		await expect(planLlama.sendBatch([])).rejects.toThrow("Batch failed");
 	});
 });
 
-describe("Jobber Job Management", () => {
-	let jobber: Jobber;
+describe("PlanLlama Job Management", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should get job by ID", async () => {
@@ -515,7 +515,7 @@ describe("Jobber Job Management", () => {
 			}
 		});
 
-		const job = await jobber.getJobById("job-123");
+		const job = await planLlama.getJobById("job-123");
 
 		expect(job).toEqual(mockJob);
 		expect(mockSocket.emit).toHaveBeenCalledWith(
@@ -532,7 +532,7 @@ describe("Jobber Job Management", () => {
 			}
 		});
 
-		await expect(jobber.cancel("job-123")).resolves.toBeUndefined();
+		await expect(planLlama.cancel("job-123")).resolves.toBeUndefined();
 
 		expect(mockSocket.emit).toHaveBeenCalledWith(
 			"cancel_job",
@@ -550,7 +550,7 @@ describe("Jobber Job Management", () => {
 			}
 		});
 
-		const result = await jobber.getQueueSize("a-queue");
+		const result = await planLlama.getQueueSize("a-queue");
 
 		expect(result).toEqual(queueSize);
 		expect(mockSocket.emit).toHaveBeenCalledWith(
@@ -567,29 +567,29 @@ describe("Jobber Job Management", () => {
 			}
 		});
 
-		await expect(jobber.getJobById("nonexistent")).rejects.toThrow(
+		await expect(planLlama.getJobById("nonexistent")).rejects.toThrow(
 			"Job not found",
 		);
 	});
 });
 
-describe("Jobber Event Handling", () => {
-	let jobber: Jobber;
+describe("PlanLlama Event Handling", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should emit retrying event", () => {
 		const retryingHandler = jest.fn();
-		jobber.on("retrying", retryingHandler);
+		planLlama.on("retrying", retryingHandler);
 
 		const mockJob: Job = {
 			id: "job-123",
@@ -608,7 +608,7 @@ describe("Jobber Event Handling", () => {
 
 	it("should emit expired event", () => {
 		const expiredHandler = jest.fn();
-		jobber.on("expired", expiredHandler);
+		planLlama.on("expired", expiredHandler);
 
 		const mockJob: Job = {
 			id: "job-123",
@@ -627,7 +627,7 @@ describe("Jobber Event Handling", () => {
 
 	it("should emit cancelled event", () => {
 		const cancelledHandler = jest.fn();
-		jobber.on("cancelled", cancelledHandler);
+		planLlama.on("cancelled", cancelledHandler);
 
 		const mockJob: Job = {
 			id: "job-123",
@@ -646,7 +646,7 @@ describe("Jobber Event Handling", () => {
 
 	it("should emit error event on socket error", () => {
 		const errorHandler = jest.fn();
-		jobber.on("error", errorHandler);
+		planLlama.on("error", errorHandler);
 
 		const error = new Error("Socket error");
 		mockSocket.mockServerEvent("error", error);

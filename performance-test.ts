@@ -1,52 +1,50 @@
 import { randomUUID } from "node:crypto";
-import * as ProgressBar from "progress";
-import { Jobber } from "./src/client";
+import ProgressBar from "progress";
+import { PlanLlama } from "./src/client";
 
 const durationSeconds = parseInt(process.argv[2] || '10', 10);
-const tasksPerSecond = 1000;
-const totalTasks = durationSeconds * tasksPerSecond;
 
 async function main() {
-	const jobber = new Jobber("your-customer-token-here");
+	const planLlama = new PlanLlama("your-customer-token-here");
 	let completed = 0;
 	let failed = 0;
 
-	jobber.on("completed", () => {
+	planLlama.on("completed", () => {
 		completed++;
 	});
-	jobber.on("failed", () => {
+	planLlama.on("failed", () => {
 		failed++;
 	});
 
-	await jobber.start();
+	await planLlama.start();
 
 		const jobName = `add-${randomUUID()}`;
-		jobber.work(jobName, async (job) => {
+		planLlama.work(jobName, async (job) => {
 			const { a, b } = job.data as { a: number; b: number };
 			return a + b;
 		});
 
-		const bar = new ProgressBar("Queuing [:bar] :percent :current", {
+		const bar = new ProgressBar("Queuing [:bar] :percent Queued: :queued", {
 			total: durationSeconds,
 			width: 40,
 		});
 
 		console.log(`Queuing jobs for ${durationSeconds} seconds...`);
 		let queued = 0;
-		let lastQueued = 0;
 		const startTime = Date.now();
 		let elapsed = 0;
 
 		const queueInterval = setInterval(() => {
 			const now = Date.now();
 			elapsed = (now - startTime) / 1000;
-			bar.tick(0, {});
-			process.stdout.write(`\rQueued: ${queued} jobs in ${elapsed.toFixed(1)}s`);
-			lastQueued = queued;
+			bar.tick(1, {queued});
+			if (bar.complete) {
+					clearInterval(queueInterval);
+			}
 		}, 1000);
 
 		while (elapsed < durationSeconds) {
-			await jobber.send(jobName, { a: 1, b: 2 });
+			await planLlama.send(jobName, { a: 1, b: 2 });
 			queued++;
 		  const now = Date.now();
 			elapsed = (now - startTime) / 1000;
@@ -64,8 +62,8 @@ async function main() {
 		console.log(`\nPerformance test complete.`);
 		console.log(`Jobs queued per second: ${(queued / durationSeconds).toFixed(2)}`);
 		console.log(`Jobs worked per second: ${(queued / totalElapsed).toFixed(2)}`);
-    console.log(`Remaining jobs: ${await jobber.getQueueSize(jobName)}`);
-		await jobber.stop();
+    console.log(`Remaining jobs: ${await planLlama.getQueueSize(jobName)}`);
+		await planLlama.stop();
 }
 
 main().catch((err) => {

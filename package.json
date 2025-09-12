@@ -1,7 +1,7 @@
 {
-	"name": "jobber",
+	"name": "plan-llama",
 	"version": "1.0.0",
-	"description": "A simple and powerful job scheduler for Node.js applications without requiring a database connection",
+	"description": "A simple and powerful cloud based job scheduler for Node.js applications without requiring a database connection",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {

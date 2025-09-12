@@ -68,7 +68,7 @@ interface HandlerInfo {
 	options?: WorkOptions;
 }
 
-export class Jobber extends EventEmitter {
+export class PlanLlama extends EventEmitter {
 	private customerToken: string;
 	private serverUrl: string;
 	private socket: Socket | null = null;
@@ -87,7 +87,8 @@ export class Jobber extends EventEmitter {
 				throw new Error("Customer token is required");
 			}
 			this.customerToken = customerTokenOrOptions;
-			this.serverUrl = process.env.JOBBER_SERVER_URL || "http://localhost:3000";
+			this.serverUrl =
+				process.env.PlanLlama_SERVER_URL || "http://localhost:3000";
 		} else {
 			if (!customerTokenOrOptions || !customerTokenOrOptions.customerToken) {
 				throw new Error("Customer options with token are required");
@@ -95,13 +96,13 @@ export class Jobber extends EventEmitter {
 			this.customerToken = customerTokenOrOptions.customerToken;
 			this.serverUrl =
 				customerTokenOrOptions.serverUrl ||
-				process.env.JOBBER_SERVER_URL ||
+				process.env.PlanLlama_SERVER_URL ||
 				"http://localhost:3000";
 		}
 	}
 
 	/**
-	 * Starts the Jobber client and connects to the server.
+	 * Starts the PlanLlama client and connects to the server.
 	 * @returns {Promise<void>} Resolves when the client is ready.
 	 * @throws {Error} If connection fails or times out.
 	 */
@@ -137,7 +138,7 @@ export class Jobber extends EventEmitter {
 
 			this.socket.on("connect", () => {
 				clearTimeout(connectionTimeout);
-				console.log("Connected to Jobber server");
+				console.log("Connected to PlanLlama server");
 				this.isStarted = true;
 				// this.reconnectAttempts = 0;
 				this.setupEventHandlers();
@@ -149,12 +150,15 @@ export class Jobber extends EventEmitter {
 
 			this.socket.on("connect_error", (error) => {
 				clearTimeout(connectionTimeout);
-				console.error("Failed to connect to Jobber server:", JSON.stringify(error));
+				console.error(
+					"Failed to connect to PlanLlama server:",
+					JSON.stringify(error),
+				);
 				reject(new Error(`Failed to connect: ${error.message}`));
 			});
 
 			this.socket.on("disconnect", (reason) => {
-				console.log("Disconnected from Jobber server:", reason);
+				console.log("Disconnected from PlanLlama server:", reason);
 				this.isStarted = false;
 
 				// if (reason === "io server disconnect") {
@@ -249,7 +253,7 @@ export class Jobber extends EventEmitter {
 	// }
 
 	/**
-	 * Stops the Jobber client and disconnects from the server.
+	 * Stops the PlanLlama client and disconnects from the server.
 	 * @returns {Promise<void>} Resolves when the client is stopped.
 	 */
 	async stop(): Promise<void> {
@@ -261,7 +265,7 @@ export class Jobber extends EventEmitter {
 			this.socket?.disconnect();
 			this.isStarted = false;
 			this.socket = null;
-			console.log("Jobber stopped");
+			console.log("PlanLlama stopped");
 			resolve();
 		});
 	}
@@ -281,7 +285,7 @@ export class Jobber extends EventEmitter {
 		options?: JobOptions,
 	): Promise<string> {
 		if (!this.isStarted || !this.socket) {
-			throw new Error("Jobber not started. Call start() first.");
+			throw new Error("PlanLlama not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
@@ -318,7 +322,7 @@ export class Jobber extends EventEmitter {
 		options?: JobOptions,
 	): Promise<void> {
 		if (!this.isStarted || !this.socket) {
-			throw new Error("Jobber not started. Call start() first.");
+			throw new Error("PlanLlama not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
@@ -392,7 +396,7 @@ export class Jobber extends EventEmitter {
 	 */
 	async sendBatch(jobs: BatchJob[]): Promise<string> {
 		if (!this.isStarted || !this.socket) {
-			throw new Error("Jobber not started. Call start() first.");
+			throw new Error("PlanLlama not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
@@ -416,7 +420,7 @@ export class Jobber extends EventEmitter {
 	 */
 	async waitForBatch(batchId: string): Promise<void> {
 		if (!this.isStarted || !this.socket) {
-			throw new Error("Jobber not started. Call start() first.");
+			throw new Error("PlanLlama not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
@@ -443,7 +447,7 @@ export class Jobber extends EventEmitter {
 	 */
 	async getJobById<T = unknown>(jobId: string): Promise<Job<T> | undefined> {
 		if (!this.isStarted || !this.socket) {
-			throw new Error("Jobber not started. Call start() first.");
+			throw new Error("PlanLlama not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
@@ -471,7 +475,7 @@ export class Jobber extends EventEmitter {
 	 */
 	async cancel(jobId: string): Promise<void> {
 		if (!this.isStarted || !this.socket) {
-			throw new Error("Jobber not started. Call start() first.");
+			throw new Error("PlanLlama not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {
@@ -493,7 +497,7 @@ export class Jobber extends EventEmitter {
 	 */
 	async getQueueSize(jobName: string): Promise<number> {
 		if (!this.isStarted || !this.socket) {
-			throw new Error("Jobber not started. Call start() first.");
+			throw new Error("PlanLlama not started. Call start() first.");
 		}
 
 		return new Promise((resolve, reject) => {

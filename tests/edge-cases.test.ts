@@ -1,9 +1,9 @@
 import type { Job } from "../src/client";
-import { Jobber } from "../src/client";
+import { PlanLlama } from "../src/client";
 import { mockSocket } from "./__mocks__/socket.io-client";
 
-describe("Jobber Error Handling and Edge Cases", () => {
-	let jobber: Jobber;
+describe("PlanLlama Error Handling and Edge Cases", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -36,31 +36,31 @@ describe("Jobber Error Handling and Edge Cases", () => {
 	});
 
 	afterEach(async () => {
-		if (jobber) {
-			await jobber.stop();
+		if (planLlama) {
+			await planLlama.stop();
 		}
 	});
 
 	describe("Connection Edge Cases", () => {
 		it("should handle connection timeout", async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
 
-			const connectPromise = jobber.start();
+			const connectPromise = planLlama.start();
 
 			// Don't trigger connect event (simulates timeout)
 			await expect(connectPromise).rejects.toThrow();
 		});
 
 		it("should handle immediate disconnection after connection", async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
 
-			const connectPromise = jobber.start();
+			const connectPromise = planLlama.start();
 
 			// Simulate connection followed immediately by disconnection
 			mockSocket.mockConnect();
@@ -77,7 +77,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 
 		it("should handle malformed server URL", () => {
 			expect(() => {
-				jobber = new Jobber({
+				planLlama = new PlanLlama({
 					customerToken: "test-token",
 					serverUrl: "invalid-url",
 				});
@@ -85,18 +85,18 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		});
 
 		it("should handle missing environment variables gracefully", () => {
-			const originalEnv = process.env.JOBBER_SERVER_URL;
-			delete process.env.JOBBER_SERVER_URL;
+			const originalEnv = process.env.planLlama_SERVER_URL;
+			delete process.env.planLlama_SERVER_URL;
 
 			try {
-				jobber = new Jobber({
+				planLlama = new PlanLlama({
 					customerToken: "test-token",
 					serverUrl: "http://localhost:3000",
 				});
-				expect(jobber).toBeInstanceOf(Jobber);
+				expect(planLlama).toBeInstanceOf(PlanLlama);
 			} finally {
 				if (originalEnv) {
-					process.env.JOBBER_SERVER_URL = originalEnv;
+					process.env.planLlama_SERVER_URL = originalEnv;
 				}
 			}
 		});
@@ -104,11 +104,11 @@ describe("Jobber Error Handling and Edge Cases", () => {
 
 	describe("Job Sending Edge Cases", () => {
 		beforeEach(async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
-			const connectPromise = jobber.start();
+			const connectPromise = planLlama.start();
 			mockSocket.mockConnect();
 			await connectPromise;
 		});
@@ -119,7 +119,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 				// No callback called
 			});
 
-			const _sendPromise = jobber.send("timeout-job", {});
+			const _sendPromise = planLlama.send("timeout-job", {});
 
 			// This will hang indefinitely in real scenario
 			// In test, we'll just verify the call was made
@@ -138,7 +138,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 				}
 			});
 
-			await expect(jobber.send("test-job", {})).rejects.toThrow(
+			await expect(planLlama.send("test-job", {})).rejects.toThrow(
 				"Invalid response from server",
 			);
 		});
@@ -151,12 +151,12 @@ describe("Jobber Error Handling and Edge Cases", () => {
 			});
 
 			// Should handle null data
-			await expect(jobber.send("test-job", null)).resolves.toBe(
+			await expect(planLlama.send("test-job", null)).resolves.toBe(
 				"null-data-job",
 			);
 
 			// Should handle undefined data
-			await expect(jobber.send("test-job", undefined)).resolves.toBe(
+			await expect(planLlama.send("test-job", undefined)).resolves.toBe(
 				"null-data-job",
 			);
 		});
@@ -176,7 +176,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 				}
 			});
 
-			await expect(jobber.send("large-job", largePayload)).resolves.toBe(
+			await expect(planLlama.send("large-job", largePayload)).resolves.toBe(
 				"large-payload-job",
 			);
 		});
@@ -192,7 +192,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 			});
 
 			// Should not throw when sending circular data (JSON.stringify might fail, but that's server-side)
-			await expect(jobber.send("circular-job", circularData)).resolves.toBe(
+			await expect(planLlama.send("circular-job", circularData)).resolves.toBe(
 				"circular-job",
 			);
 		});
@@ -200,17 +200,17 @@ describe("Jobber Error Handling and Edge Cases", () => {
 
 	describe("Job Processing Edge Cases", () => {
 		beforeEach(async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
-			const connectPromise = jobber.start();
+			const connectPromise = planLlama.start();
 			mockSocket.mockConnect();
 			await connectPromise;
 		});
 
 		it("should handle job handler throwing non-Error objects", async () => {
-			jobber.work("weird-error-job", async () => {
+			planLlama.work("weird-error-job", async () => {
 				// eslint-disable-next-line @typescript-eslint/no-throw-literal
 				throw "string error";
 			});
@@ -236,7 +236,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		});
 
 		it("should handle job handler returning undefined", async () => {
-			jobber.work("undefined-result-job", async () => {
+			planLlama.work("undefined-result-job", async () => {
 				return undefined;
 			});
 
@@ -261,7 +261,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		});
 
 		it("should handle job handler that never resolves", async () => {
-			jobber.work("hanging-job", async () => {
+			planLlama.work("hanging-job", async () => {
 				// Simulate hanging promise
 				return new Promise(() => {
 					// Never resolves
@@ -299,7 +299,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		});
 
 		it("should handle malformed job data from server", async () => {
-			jobber.work("normal-job", async (job) => {
+			planLlama.work("normal-job", async (job) => {
 				return { processed: job.id };
 			});
 
@@ -318,7 +318,7 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		});
 
 		it("should handle job with extremely deep nested data", async () => {
-			jobber.work("deep-nested-job", async (job) => {
+			planLlama.work("deep-nested-job", async (job) => {
 				// Just process the job without accessing deep nested data to avoid errors
 				return { processed: true, jobId: job.id };
 			});
@@ -358,11 +358,11 @@ describe("Jobber Error Handling and Edge Cases", () => {
 
 	describe("Event System Edge Cases", () => {
 		beforeEach(async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
-			const connectPromise = jobber.start();
+			const connectPromise = planLlama.start();
 			mockSocket.mockConnect();
 			await connectPromise;
 		});
@@ -370,11 +370,11 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		it("should handle event listener that throws errors", async () => {
 			const consoleError = jest.spyOn(console, "error").mockImplementation();
 
-			jobber.on("completed", () => {
+			planLlama.on("completed", () => {
 				throw new Error("Event listener error");
 			});
 
-			jobber.work("test-job", async () => ({ success: true }));
+			planLlama.work("test-job", async () => ({ success: true }));
 
 			const mockJob: Job = {
 				id: "event-error-123",
@@ -405,12 +405,12 @@ describe("Jobber Error Handling and Edge Cases", () => {
 			const listener = () => {
 				eventCount++;
 				if (eventCount === 1) {
-					jobber.removeListener("completed", listener);
+					planLlama.removeListener("completed", listener);
 				}
 			};
 
-			jobber.on("completed", listener);
-			jobber.work("test-job", async () => ({ success: true }));
+			planLlama.on("completed", listener);
+			planLlama.work("test-job", async () => ({ success: true }));
 
 			// Trigger multiple events
 			for (let i = 0; i < 3; i++) {
@@ -433,42 +433,40 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		});
 
 		it("should handle memory leaks from event listeners", async () => {
-			const initialListenerCount = jobber.listenerCount("completed");
+			const initialListenerCount = planLlama.listenerCount("completed");
 
 			// Add many listeners
 			const listeners = Array.from({ length: 1000 }, () => () => {
 				/* empty listener */
 			});
 
-			listeners.forEach((listener) => jobber.on("completed", listener));
+			listeners.forEach((listener) => planLlama.on("completed", listener));
 
-			expect(jobber.listenerCount("completed")).toBe(
-				initialListenerCount + 1000,
-			);
+			expect(planLlama.listenerCount("completed")).toBe(initialListenerCount + 1000);
 
 			// Remove all listeners
 			listeners.forEach((listener) =>
-				jobber.removeListener("completed", listener),
+				planLlama.removeListener("completed", listener),
 			);
 
-			expect(jobber.listenerCount("completed")).toBe(initialListenerCount);
+			expect(planLlama.listenerCount("completed")).toBe(initialListenerCount);
 		});
 	});
 
 	describe("Graceful Shutdown Edge Cases", () => {
 		it("should handle stop during active job processing", async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
 
-			const connectPromise = jobber.start();
+			const connectPromise = planLlama.start();
 			mockSocket.mockConnect();
 			await connectPromise;
 
 			let jobInProgress = false;
 
-			jobber.work("long-running-job", async () => {
+			planLlama.work("long-running-job", async () => {
 				jobInProgress = true;
 				// Simulate long-running job that takes a bit of time
 				await new Promise((resolve) => setTimeout(resolve, 50));
@@ -494,23 +492,27 @@ describe("Jobber Error Handling and Edge Cases", () => {
 			expect(jobInProgress).toBe(true);
 
 			// Stop while job is running
-			await jobber.stop();
+			await planLlama.stop();
 
 			expect(mockSocket.disconnect).toHaveBeenCalled();
 		});
 
 		it("should handle multiple stop calls", async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
 
-			const connectPromise = jobber.start();
+			const connectPromise = planLlama.start();
 			mockSocket.mockConnect();
 			await connectPromise;
 
 			// Call stop multiple times
-			const stopPromises = [jobber.stop(), jobber.stop(), jobber.stop()];
+			const stopPromises = [
+				planLlama.stop(),
+				planLlama.stop(),
+				planLlama.stop(),
+			];
 
 			await Promise.all(stopPromises);
 
@@ -519,13 +521,13 @@ describe("Jobber Error Handling and Edge Cases", () => {
 		});
 
 		it("should handle stop without start", async () => {
-			jobber = new Jobber({
+			planLlama = new PlanLlama({
 				customerToken: "test-token",
 				serverUrl: "http://localhost:3000",
 			});
 
 			// Should not throw
-			await expect(jobber.stop()).resolves.toBeUndefined();
+			await expect(planLlama.stop()).resolves.toBeUndefined();
 		});
 	});
 });

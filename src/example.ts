@@ -1,29 +1,29 @@
-import { Jobber } from "./client";
+import { PlanLlama } from "./client";
 
-// Example usage of the Jobber client
+// Example usage of the PlanLlama client
 async function main() {
-	// Initialize Jobber with customer token
-	const jobber = new Jobber("your-customer-token-here");
+	// Initialize PlanLlama with customer token
+	const planLlama = new PlanLlama("your-customer-token-here");
 
 	// Set up event listeners
-	jobber.on("completed", (job, result) => {
+	planLlama.on("completed", (job, result) => {
 		console.log(`Job ${job.id} completed with result:`, result);
 	});
 
-	jobber.on("failed", (job, error) => {
+	planLlama.on("failed", (job, error) => {
 		console.error(`Job ${job.id} failed:`, error);
 	});
 
-	jobber.on("retrying", (job) => {
+	planLlama.on("retrying", (job) => {
 		console.log(`Retrying job ${job.id}, attempt ${job.retryCount + 1}`);
 	});
 
 	try {
 		// Start the connection to the server
-		await jobber.start();
+		await planLlama.start();
 
 		// Register job handlers
-		jobber.work("send-email", async (job) => {
+		planLlama.work("send-email", async (job) => {
 			const { to, subject } = job.data as {
 				to: string;
 				subject: string;
@@ -37,7 +37,7 @@ async function main() {
 			return { success: true, messageId: "msg-123" };
 		});
 
-		jobber.work(
+		planLlama.work(
 			"process-payment",
 			{
 				teamSize: 3,
@@ -66,7 +66,7 @@ async function main() {
 		);
 
 		// Send some jobs
-		const emailJobId = await jobber.send("send-email", {
+		const emailJobId = await planLlama.send("send-email", {
 			to: "user@example.com",
 			subject: "Welcome!",
 			body: "Thanks for signing up!",
@@ -74,7 +74,7 @@ async function main() {
 		console.log("Email job sent:", emailJobId);
 
 		// Send a payment job with retry options
-		const paymentJobId = await jobber.send(
+		const paymentJobId = await planLlama.send(
 			"process-payment",
 			{
 				userId: 123,
@@ -90,14 +90,14 @@ async function main() {
 		console.log("Payment job sent:", paymentJobId);
 
 		// Schedule a recurring job
-		const scheduleId = await jobber.schedule("daily-report", "0 9 * * *", {
+		const scheduleId = await planLlama.schedule("daily-report", "0 9 * * *", {
 			reportType: "daily",
 			recipients: ["admin@example.com"],
 		});
 		console.log("Daily report scheduled:", scheduleId);
 
 		// Send a batch of jobs
-		const batchId = await jobber.sendBatch([
+		const batchId = await planLlama.sendBatch([
 			{
 				name: "send-email",
 				data: { to: "user1@example.com", subject: "Hello", body: "Message 1" },
@@ -114,14 +114,14 @@ async function main() {
 		console.log("Batch sent:", batchId);
 
 		// Get queue statistics
-		const queueSize = await jobber.getQueueSize("send-email");
+		const queueSize = await planLlama.getQueueSize("send-email");
 		console.log("Queue size:", queueSize);
 
 		// Wait a bit for jobs to process
 		await new Promise((resolve) => setTimeout(resolve, 5000));
 
 		// Get job details
-		const emailJob = await jobber.getJobById(emailJobId);
+		const emailJob = await planLlama.getJobById(emailJobId);
 		console.log("Email job status:", emailJob?.state);
 	} catch (error) {
 		console.error("Error:", error);
@@ -130,7 +130,7 @@ async function main() {
 	// Graceful shutdown
 	process.on("SIGINT", async () => {
 		console.log("Shutting down...");
-		await jobber.stop();
+		await planLlama.stop();
 		process.exit(0);
 	});
 }

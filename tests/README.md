@@ -1,6 +1,6 @@
 # Test Suite Documentation
 
-This document describes the comprehensive test suite for the Jobber library.
+This document describes the comprehensive test suite for the PlanLlama library.
 
 ## Test Structure
 
@@ -25,7 +25,7 @@ This document describes the comprehensive test suite for the Jobber library.
 - **High Volume**: Tests processing 1000+ jobs with throughput requirements (>200 jobs/sec)
 - **Memory Efficiency**: Tests handling large payloads (1MB+) without memory leaks
 - **Event Performance**: Tests high-frequency event emission (100+ events/sec)
-- **Concurrent Connections**: Tests multiple simultaneous Jobber instances
+- **Concurrent Connections**: Tests multiple simultaneous PlanLlama instances
 
 ### Edge Cases Tests (`edge-cases.test.ts`)
 
@@ -142,4 +142,4 @@ The test suite aims for:
 3. Ensure proper cleanup to prevent test interference
 4. Use verbose Jest output for detailed error information
 
-This comprehensive test suite ensures the Jobber library is reliable, performant, and handles edge cases gracefully.
+This comprehensive test suite ensures the PlanLlama library is reliable, performant, and handles edge cases gracefully.

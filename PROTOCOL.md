@@ -1,6 +1,6 @@
-# Jobber Socket.IO Protocol
+# PlanLlama Socket.IO Protocol
 
-This document describes the socket.io protocol used by the Jobber client to communicate with the Jobber server.
+This document describes the socket.io protocol used by the PlanLlama client to communicate with the PlanLlama server.
 
 ## Connection
 

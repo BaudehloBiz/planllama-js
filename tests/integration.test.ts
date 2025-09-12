@@ -1,10 +1,10 @@
 import type { Job } from "../src/client";
-import { Jobber } from "../src/client";
+import { PlanLlama } from "../src/client";
 import { mockSocket } from "./__mocks__/socket.io-client";
 
 // Integration tests that test multiple components working together
-describe("Jobber Integration Tests", () => {
-	let jobber: Jobber;
+describe("PlanLlama Integration Tests", () => {
+	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
 		jest.clearAllMocks();
@@ -12,14 +12,14 @@ describe("Jobber Integration Tests", () => {
 		mockSocket.connected = false;
 		mockSocket.disconnected = true;
 
-		jobber = new Jobber("test-token");
-		const connectPromise = jobber.start();
+		planLlama = new PlanLlama("test-token");
+		const connectPromise = planLlama.start();
 		mockSocket.mockConnect();
 		await connectPromise;
 	});
 
 	afterEach(async () => {
-		await jobber.stop();
+		await planLlama.stop();
 	});
 
 	it("should handle complete email workflow", async () => {
@@ -27,11 +27,11 @@ describe("Jobber Integration Tests", () => {
 		const failedJobs: Job[] = [];
 
 		// Set up event listeners
-		jobber.on("completed", (job) => completedJobs.push(job));
-		jobber.on("failed", (job) => failedJobs.push(job));
+		planLlama.on("completed", (job) => completedJobs.push(job));
+		planLlama.on("failed", (job) => failedJobs.push(job));
 
 		// Register email handler
-		jobber.work("send-email", async (job) => {
+		planLlama.work("send-email", async (job) => {
 			const { to, subject } = job.data as { to: string; subject: string };
 
 			if (!to || !subject) {
@@ -55,7 +55,7 @@ describe("Jobber Integration Tests", () => {
 		});
 
 		// Send an email job
-		const jobId = await jobber.send("send-email", {
+		const jobId = await planLlama.send("send-email", {
 			to: "user@example.com",
 			subject: "Welcome!",
 			body: "Thanks for signing up!",
@@ -107,12 +107,12 @@ describe("Jobber Integration Tests", () => {
 		const failedJobs: Job[] = [];
 		const retryingJobs: Job[] = [];
 
-		jobber.on("failed", (job) => failedJobs.push(job));
-		jobber.on("retrying", (job) => retryingJobs.push(job));
+		planLlama.on("failed", (job) => failedJobs.push(job));
+		planLlama.on("retrying", (job) => retryingJobs.push(job));
 
 		// Register a failing handler
 		let attemptCount = 0;
-		jobber.work("flaky-job", async () => {
+		planLlama.work("flaky-job", async () => {
 			attemptCount++;
 			if (attemptCount < 3) {
 				throw new Error(`Attempt ${attemptCount} failed`);
@@ -127,7 +127,7 @@ describe("Jobber Integration Tests", () => {
 			}
 		});
 
-		const jobId = await jobber.send(
+		const jobId = await planLlama.send(
 			"flaky-job",
 			{ data: "test" },
 			{
@@ -174,7 +174,7 @@ describe("Jobber Integration Tests", () => {
 		const processedJobs: string[] = [];
 
 		// Register batch processor
-		jobber.work("batch-item", async (job) => {
+		planLlama.work("batch-item", async (job) => {
 			const { id, data } = job.data as { id: string; data: string };
 			processedJobs.push(id);
 
@@ -200,7 +200,7 @@ describe("Jobber Integration Tests", () => {
 			{ name: "batch-item", data: { id: "item-3", data: "data-3" } },
 		];
 
-		const batchId = await jobber.sendBatch(batchJobs);
+		const batchId = await planLlama.sendBatch(batchJobs);
 		expect(batchId).toBe("batch-789");
 
 		// Give worker registration time to complete
@@ -227,7 +227,7 @@ describe("Jobber Integration Tests", () => {
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		// Wait for batch completion
-		await jobber.waitForBatch(batchId);
+		await planLlama.waitForBatch(batchId);
 
 		// Verify all batch items were processed
 		expect(processedJobs).toHaveLength(3);
@@ -241,7 +241,7 @@ describe("Jobber Integration Tests", () => {
 		const endTimes: Record<string, number> = {};
 
 		// Register handler with concurrency options
-		jobber.work(
+		planLlama.work(
 			"concurrent-job",
 			{
 				teamSize: 3,
@@ -303,7 +303,7 @@ describe("Jobber Integration Tests", () => {
 		const connectionEvents: string[] = [];
 		const errorEvents: Error[] = [];
 
-		jobber.on("error", (error) => errorEvents.push(error));
+		planLlama.on("error", (error) => errorEvents.push(error));
 
 		// Track connection state changes
 		const originalEmit = mockSocket.emit;
