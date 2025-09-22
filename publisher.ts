@@ -5,7 +5,7 @@ const durationSeconds = parseInt(process.argv[2] || '10', 10);
 const jobName = `remote-${new Date().toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit'}) }`;
 
 async function main() {
-  const planLlama = new PlanLlama("your-customer-token-here");
+  const planLlama = new PlanLlama(process.env.PLANLLAMA_TOKEN || "test-token");
   let completed = 0;
   let failed = 0;
 

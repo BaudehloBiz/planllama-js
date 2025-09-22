@@ -13,8 +13,8 @@ npm install planLlama
 ```typescript
 import { PlanLlama } from "planLlama";
 
-// Initialize with your customer token
-const planLlama = new PlanLlama("your-customer-token");
+// Initialize with your api token
+const planLlama = new PlanLlama("your-api-token");
 
 // Start the job scheduler
 await planLlama.start();
@@ -35,11 +35,11 @@ await planLlama.send("send-email", {
 import { PlanLlama } from "planLlama";
 
 // Option 1: Initialize with token string
-const planLlama = new PlanLlama("your-customer-token");
+const planLlama = new PlanLlama("your-api-token");
 
 // Option 2: Initialize with options object
 const planLlama = new PlanLlama({
-  customerToken: "your-customer-token",
+  apiToken: "your-api-token",
   // Additional options can be added here
 });
 ```
@@ -251,7 +251,7 @@ try {
   if (error.code === "RATE_LIMIT_EXCEEDED") {
     console.log("Rate limit exceeded, try again later");
   } else if (error.code === "INVALID_TOKEN") {
-    console.log("Invalid customer token");
+    console.log("Invalid api token");
   } else {
     console.log("Unexpected error:", error.message);
   }
@@ -273,9 +273,9 @@ process.on("SIGINT", async () => {
 ### Constructor Options
 
 ```typescript
-interface CustomerOptions {
-  customerToken: string;
-  // Additional configuration options
+interface PlanLlamaOptions {
+  apiToken: string;
+  serverUrl?: string;
 }
 ```
 

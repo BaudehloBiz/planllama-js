@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 
-export interface CustomerOptions {
-	customerToken: string;
-	serverUrl?: string;
+export interface PlanLlamaOptions {
+  apiToken: string;
+  serverUrl?: string;
 }
 
 export interface JobOptions {
@@ -69,451 +69,450 @@ interface HandlerInfo {
 }
 
 export class PlanLlama extends EventEmitter {
-	private customerToken: string;
-	private serverUrl: string;
-	private socket: Socket | null = null;
-	private isStarted = false;
-	private jobHandlers = new Map<string, HandlerInfo>();
-	// private reconnectAttempts = 0;
-	// private maxReconnectAttempts = 10;
+  private apiToken: string;
+  private serverUrl: string;
+  private socket: Socket | null = null;
+  private isStarted = false;
+  private jobHandlers = new Map<string, HandlerInfo>();
+  // private reconnectAttempts = 0;
+  // private maxReconnectAttempts = 10;
 
-	constructor(customerToken: string);
-	constructor(customerOptions: CustomerOptions);
-	constructor(customerTokenOrOptions: string | CustomerOptions) {
-		super();
+  constructor(apiToken: string);
+  constructor(options: PlanLlamaOptions);
+  constructor(apiTokenOrOptions: string | PlanLlamaOptions) {
+    super();
 
-		if (typeof customerTokenOrOptions === "string") {
-			if (!customerTokenOrOptions) {
-				throw new Error("Customer token is required");
-			}
-			this.customerToken = customerTokenOrOptions;
-			this.serverUrl =
-				process.env.PlanLlama_SERVER_URL || "http://localhost:3000";
-		} else {
-			if (!customerTokenOrOptions || !customerTokenOrOptions.customerToken) {
-				throw new Error("Customer options with token are required");
-			}
-			this.customerToken = customerTokenOrOptions.customerToken;
-			this.serverUrl =
-				customerTokenOrOptions.serverUrl ||
-				process.env.PlanLlama_SERVER_URL ||
-				"http://localhost:3000";
-		}
-	}
+    if (typeof apiTokenOrOptions === "string") {
+      if (!apiTokenOrOptions) {
+        throw new Error("Customer token is required");
+      }
+      this.apiToken = apiTokenOrOptions;
+      this.serverUrl = process.env.SERVER_URL || "http://localhost:3000";
+    } else {
+      if (!apiTokenOrOptions || !apiTokenOrOptions.apiToken) {
+        throw new Error("Customer options with token are required");
+      }
+      this.apiToken = apiTokenOrOptions.apiToken;
+      this.serverUrl =
+        apiTokenOrOptions.serverUrl ||
+        process.env.SERVER_URL ||
+        "http://localhost:3000";
+    }
+  }
 
-	/**
-	 * Starts the PlanLlama client and connects to the server.
-	 * @returns {Promise<void>} Resolves when the client is ready.
-	 * @throws {Error} If connection fails or times out.
-	 */
-	async start(): Promise<void> {
-		if (this.isStarted) {
-			return;
-		}
+  /**
+   * Starts the PlanLlama client and connects to the server.
+   * @returns {Promise<void>} Resolves when the client is ready.
+   * @throws {Error} If connection fails or times out.
+   */
+  async start(): Promise<void> {
+    if (this.isStarted) {
+      return;
+    }
 
-		const { version } = JSON.parse(await readFile("package.json", "utf-8")) as {
-			version: string;
-			name: string;
-			description: string;
-		};
+    const { version } = JSON.parse(await readFile("package.json", "utf-8")) as {
+      version: string;
+      name: string;
+      description: string;
+    };
 
-		return new Promise((resolve, reject) => {
-			// Set a connection timeout
-			const connectionTimeout = setTimeout(() => {
-				reject(new Error("Connection timeout"));
-			}, 10000); // 10 second timeout
+    return new Promise((resolve, reject) => {
+      // Set a connection timeout
+      const connectionTimeout = setTimeout(() => {
+        reject(new Error("Connection timeout"));
+      }, 10000); // 10 second timeout
 
-			this.socket = io(this.serverUrl, {
-				path: "/ws",
-				auth: {
-					customerToken: this.customerToken,
-				},
-				transports: ["websocket", "polling"],
-				tryAllTransports: true,
-				withCredentials: true,
-				extraHeaders: {
-					"User-Agent": `planllama-client/${version}`,
-				},
-			});
+      this.socket = io(this.serverUrl, {
+        path: "/ws",
+        auth: {
+          apiToken: this.apiToken,
+        },
+        transports: ["websocket", "polling"],
+        tryAllTransports: true,
+        withCredentials: true,
+        extraHeaders: {
+          "User-Agent": `planllama-client/${version}`,
+        },
+      });
 
-			this.socket.on("connect", () => {
-				clearTimeout(connectionTimeout);
-				console.log("Connected to PlanLlama server");
-				this.isStarted = true;
-				// this.reconnectAttempts = 0;
-				this.setupEventHandlers();
-			});
+      this.socket.on("connect", () => {
+        clearTimeout(connectionTimeout);
+        console.log("Connected to PlanLlama server");
+        this.isStarted = true;
+        // this.reconnectAttempts = 0;
+        this.setupEventHandlers();
+      });
 
-			this.socket.on("client_ready", () => {
-				resolve();
-			});
+      this.socket.on("client_ready", () => {
+        resolve();
+      });
 
-			this.socket.on("connect_error", (error) => {
-				clearTimeout(connectionTimeout);
-				console.error(
-					"Failed to connect to PlanLlama server:",
-					JSON.stringify(error),
-				);
-				reject(new Error(`Failed to connect: ${error.message}`));
-			});
+      this.socket.on("connect_error", (error) => {
+        clearTimeout(connectionTimeout);
+        console.error(
+          "Failed to connect to PlanLlama server:",
+          JSON.stringify(error)
+        );
+        reject(new Error(`Failed to connect: ${error.message}`));
+      });
 
-			this.socket.on("disconnect", (reason) => {
-				console.log("Disconnected from PlanLlama server:", reason);
-				this.isStarted = false;
+      this.socket.on("disconnect", (reason) => {
+        console.log("Disconnected from PlanLlama server:", reason);
+        this.isStarted = false;
 
-				// if (reason === "io server disconnect") {
-				// 	// Server disconnected us, try to reconnect
-				// 	this.handleReconnection();
-				// }
-			});
+        // if (reason === "io server disconnect") {
+        // 	// Server disconnected us, try to reconnect
+        // 	this.handleReconnection();
+        // }
+      });
 
-			this.socket.on("error", (error) => {
-				console.error("Socket error:", error);
-				super.emit("error", error);
-			});
-		});
-	}
+      this.socket.on("error", (error) => {
+        console.error("Socket error:", error);
+        super.emit("error", error);
+      });
+    });
+  }
 
-	private setupEventHandlers(): void {
-		if (!this.socket) return;
+  private setupEventHandlers(): void {
+    if (!this.socket) return;
 
-		// Handle incoming work requests
-		this.socket.on("work_request", async (job: Job) => {
-			const handlerInfo = this.jobHandlers.get(job.name);
+    // Handle incoming work requests
+    this.socket.on("work_request", async (job: Job) => {
+      const handlerInfo = this.jobHandlers.get(job.name);
 
-			if (!handlerInfo) {
-				console.warn(`No handler registered for job: ${job.name}`);
-				this.socket?.emit("job_failed", {
-					jobId: job.id,
-					error: `No handler registered for job: ${job.name}`,
-				});
-				return;
-			}
+      if (!handlerInfo) {
+        console.warn(`No handler registered for job: ${job.name}`);
+        this.socket?.emit("job_failed", {
+          jobId: job.id,
+          error: `No handler registered for job: ${job.name}`,
+        });
+        return;
+      }
 
-			try {
-				// Emit job started event
-				this.socket?.emit("job_started", { jobName: job.name, jobId: job.id });
-				super.emit("active", job);
+      try {
+        // Emit job started event
+        this.socket?.emit("job_started", { jobName: job.name, jobId: job.id });
+        super.emit("active", job);
 
-				// Execute the job handler
-				const result = await handlerInfo.handler(job);
+        // Execute the job handler
+        const result = await handlerInfo.handler(job);
 
-				// Emit job completed event
-				this.socket?.emit("job_completed", {
-					jobId: job.id,
-					result: result,
-				});
+        // Emit job completed event
+        this.socket?.emit("job_completed", {
+          jobId: job.id,
+          result: result,
+        });
 
-				super.emit("completed", job, result);
-			} catch (error) {
-				// Emit job failed event
-				this.socket?.emit("job_failed", {
-					jobId: job.id,
-					error: error instanceof Error ? error.message : String(error),
-				});
+        super.emit("completed", job, result);
+      } catch (error) {
+        // Emit job failed event
+        this.socket?.emit("job_failed", {
+          jobId: job.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
 
-				super.emit("failed", job, error);
-			}
-		});
+        super.emit("failed", job, error);
+      }
+    });
 
-		// Handle job events from server
-		this.socket.on("job_retrying", (job: Job) => {
-			super.emit("retrying", job);
-		});
+    // Handle job events from server
+    this.socket.on("job_retrying", (job: Job) => {
+      super.emit("retrying", job);
+    });
 
-		this.socket.on("job_expired", (job: Job) => {
-			super.emit("expired", job);
-		});
+    this.socket.on("job_expired", (job: Job) => {
+      super.emit("expired", job);
+    });
 
-		this.socket.on("job_cancelled", (job: Job) => {
-			super.emit("cancelled", job);
-		});
-	}
+    this.socket.on("job_cancelled", (job: Job) => {
+      super.emit("cancelled", job);
+    });
+  }
 
-	// private handleReconnection(): void {
-	// 	if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-	// 		console.error("Max reconnection attempts reached");
-	// 		super.emit("error", new Error("Unable to reconnect to server"));
-	// 		return;
-	// 	}
+  // private handleReconnection(): void {
+  // 	if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+  // 		console.error("Max reconnection attempts reached");
+  // 		super.emit("error", new Error("Unable to reconnect to server"));
+  // 		return;
+  // 	}
 
-	// 	this.reconnectAttempts++;
-	// 	const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
+  // 	this.reconnectAttempts++;
+  // 	const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
 
-	// 	console.log(
-	// 		`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`,
-	// 	);
+  // 	console.log(
+  // 		`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`,
+  // 	);
 
-	// 	setTimeout(() => {
-	// 		this.start().catch((error) => {
-	// 			console.error("Reconnection failed:", error);
-	// 			this.handleReconnection();
-	// 		});
-	// 	}, delay);
-	// }
+  // 	setTimeout(() => {
+  // 		this.start().catch((error) => {
+  // 			console.error("Reconnection failed:", error);
+  // 			this.handleReconnection();
+  // 		});
+  // 	}, delay);
+  // }
 
-	/**
-	 * Stops the PlanLlama client and disconnects from the server.
-	 * @returns {Promise<void>} Resolves when the client is stopped.
-	 */
-	async stop(): Promise<void> {
-		if (!this.isStarted || !this.socket) {
-			return;
-		}
+  /**
+   * Stops the PlanLlama client and disconnects from the server.
+   * @returns {Promise<void>} Resolves when the client is stopped.
+   */
+  async stop(): Promise<void> {
+    if (!this.isStarted || !this.socket) {
+      return;
+    }
 
-		return new Promise((resolve) => {
-			this.socket?.disconnect();
-			this.isStarted = false;
-			this.socket = null;
-			console.log("PlanLlama stopped");
-			resolve();
-		});
-	}
+    return new Promise((resolve) => {
+      this.socket?.disconnect();
+      this.isStarted = false;
+      this.socket = null;
+      console.log("PlanLlama stopped");
+      resolve();
+    });
+  }
 
-	/**
-	 * Sends a job to the server for processing.
-	 * @template T
-	 * @param {string} name - The name of the job.
-	 * @param {T} data - The job data.
-	 * @param {JobOptions} [options] - Optional job configuration.
-	 * @returns {Promise<string>} Resolves with the job ID.
-	 * @throws {Error} If the client is not started or server returns an error.
-	 */
-	async send<T = unknown>(
-		name: string,
-		data: T,
-		options?: JobOptions,
-	): Promise<string> {
-		if (!this.isStarted || !this.socket) {
-			throw new Error("PlanLlama not started. Call start() first.");
-		}
+  /**
+   * Sends a job to the server for processing.
+   * @template T
+   * @param {string} name - The name of the job.
+   * @param {T} data - The job data.
+   * @param {JobOptions} [options] - Optional job configuration.
+   * @returns {Promise<string>} Resolves with the job ID.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async send<T = unknown>(
+    name: string,
+    data: T,
+    options?: JobOptions
+  ): Promise<string> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
 
-		return new Promise((resolve, reject) => {
-			this.socket?.emit(
-				"send_job",
-				{ name, data, options },
-				(response: SocketResponse) => {
-					if (response.status === "error") {
-						reject(new Error(response.error));
-					} else if (response.status === "ok" && response.jobId) {
-						resolve(response.jobId);
-					} else {
-						reject(new Error("Invalid response from server"));
-					}
-				},
-			);
-		});
-	}
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "send_job",
+        { name, data, options },
+        (response: SocketResponse) => {
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else if (response.status === "ok" && response.jobId) {
+            resolve(response.jobId);
+          } else {
+            reject(new Error("Invalid response from server"));
+          }
+        }
+      );
+    });
+  }
 
-	/**
-	 * Schedules a recurring job using a cron pattern.
-	 * @template T
-	 * @param {string} name - The name of the job.
-	 * @param {string} cronPattern - The cron pattern for scheduling.
-	 * @param {T} data - The job data.
-	 * @param {JobOptions} [options] - Optional job configuration.
-	 * @returns {Promise<void>} Resolves when the job is scheduled.
-	 * @throws {Error} If the client is not started or server returns an error.
-	 */
-	async schedule<T = unknown>(
-		name: string,
-		cronPattern: string,
-		data: T,
-		options?: JobOptions,
-	): Promise<void> {
-		if (!this.isStarted || !this.socket) {
-			throw new Error("PlanLlama not started. Call start() first.");
-		}
+  /**
+   * Schedules a recurring job using a cron pattern.
+   * @template T
+   * @param {string} name - The name of the job.
+   * @param {string} cronPattern - The cron pattern for scheduling.
+   * @param {T} data - The job data.
+   * @param {JobOptions} [options] - Optional job configuration.
+   * @returns {Promise<void>} Resolves when the job is scheduled.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async schedule<T = unknown>(
+    name: string,
+    cronPattern: string,
+    data: T,
+    options?: JobOptions
+  ): Promise<void> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
 
-		return new Promise((resolve, reject) => {
-			this.socket?.emit(
-				"schedule_job",
-				{ name, cronPattern, data, options },
-				(response: SocketResponse) => {
-					if (response.status === "error") {
-						reject(new Error(response.error));
-					} else if (response.status === "ok") {
-						resolve();
-					} else {
-						reject(new Error("Invalid response from server"));
-					}
-				},
-			);
-		});
-	}
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "schedule_job",
+        { name, cronPattern, data, options },
+        (response: SocketResponse) => {
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else if (response.status === "ok") {
+            resolve();
+          } else {
+            reject(new Error("Invalid response from server"));
+          }
+        }
+      );
+    });
+  }
 
-	/**
-	 * Registers a job handler for processing jobs of a given name.
-	 * @template T, R
-	 * @param {string} name - The name of the job to handle.
-	 * @param {WorkOptions|JobHandler<T, R>} optionsOrHandler - Work options or the handler function.
-	 * @param {JobHandler<T, R>} [handler] - The handler function (if options are provided).
-	 * @throws {Error} If no handler function is provided.
-	 */
-	work<T = unknown, R = unknown>(name: string, handler: JobHandler<T, R>): void;
-	work<T = unknown, R = unknown>(
-		name: string,
-		options: WorkOptions,
-		handler: JobHandler<T, R>,
-	): void;
-	work<T = unknown, R = unknown>(
-		name: string,
-		optionsOrHandler: WorkOptions | JobHandler<T, R>,
-		handler?: JobHandler<T, R>,
-	): void {
-		let finalHandler: JobHandler<unknown, unknown>;
-		let finalOptions: WorkOptions | undefined;
+  /**
+   * Registers a job handler for processing jobs of a given name.
+   * @template T, R
+   * @param {string} name - The name of the job to handle.
+   * @param {WorkOptions|JobHandler<T, R>} optionsOrHandler - Work options or the handler function.
+   * @param {JobHandler<T, R>} [handler] - The handler function (if options are provided).
+   * @throws {Error} If no handler function is provided.
+   */
+  work<T = unknown, R = unknown>(name: string, handler: JobHandler<T, R>): void;
+  work<T = unknown, R = unknown>(
+    name: string,
+    options: WorkOptions,
+    handler: JobHandler<T, R>
+  ): void;
+  work<T = unknown, R = unknown>(
+    name: string,
+    optionsOrHandler: WorkOptions | JobHandler<T, R>,
+    handler?: JobHandler<T, R>
+  ): void {
+    let finalHandler: JobHandler<unknown, unknown>;
+    let finalOptions: WorkOptions | undefined;
 
-		if (typeof optionsOrHandler === "function") {
-			finalHandler = optionsOrHandler as JobHandler<unknown, unknown>;
-			finalOptions = undefined;
-		} else if (handler) {
-			finalHandler = handler as JobHandler<unknown, unknown>;
-			finalOptions = optionsOrHandler;
-		} else {
-			throw new Error("Handler function is required");
-		}
+    if (typeof optionsOrHandler === "function") {
+      finalHandler = optionsOrHandler as JobHandler<unknown, unknown>;
+      finalOptions = undefined;
+    } else if (handler) {
+      finalHandler = handler as JobHandler<unknown, unknown>;
+      finalOptions = optionsOrHandler;
+    } else {
+      throw new Error("Handler function is required");
+    }
 
-		this.jobHandlers.set(name, {
-			handler: finalHandler,
-			...(finalOptions && { options: finalOptions }),
-		});
+    this.jobHandlers.set(name, {
+      handler: finalHandler,
+      ...(finalOptions && { options: finalOptions }),
+    });
 
-		// Register worker with server
-		if (this.isStarted && this.socket) {
-			this.socket.emit("register_worker", {
-				jobName: name,
-				options: finalOptions,
-			});
-		}
-	}
+    // Register worker with server
+    if (this.isStarted && this.socket) {
+      this.socket.emit("register_worker", {
+        jobName: name,
+        options: finalOptions,
+      });
+    }
+  }
 
-	/**
-	 * Sends a batch of jobs to the server for processing.
-	 * @param {BatchJob[]} jobs - Array of jobs to send in batch.
-	 * @returns {Promise<string>} Resolves with the batch ID.
-	 * @throws {Error} If the client is not started or server returns an error.
-	 */
-	async sendBatch(jobs: BatchJob[]): Promise<string> {
-		if (!this.isStarted || !this.socket) {
-			throw new Error("PlanLlama not started. Call start() first.");
-		}
+  /**
+   * Sends a batch of jobs to the server for processing.
+   * @param {BatchJob[]} jobs - Array of jobs to send in batch.
+   * @returns {Promise<string>} Resolves with the batch ID.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async sendBatch(jobs: BatchJob[]): Promise<string> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
 
-		return new Promise((resolve, reject) => {
-			this.socket?.emit("send_batch", { jobs }, (response: SocketResponse) => {
-				if (response.status === "error") {
-					reject(new Error(response.error));
-				} else if (response.status === "ok" && response.batchId) {
-					resolve(response.batchId);
-				} else {
-					reject(new Error("Invalid response from server"));
-				}
-			});
-		});
-	}
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("send_batch", { jobs }, (response: SocketResponse) => {
+        if (response.status === "error") {
+          reject(new Error(response.error));
+        } else if (response.status === "ok" && response.batchId) {
+          resolve(response.batchId);
+        } else {
+          reject(new Error("Invalid response from server"));
+        }
+      });
+    });
+  }
 
-	/**
-	 * Waits for a batch of jobs to complete.
-	 * @param {string} batchId - The batch ID to wait for.
-	 * @returns {Promise<void>} Resolves when the batch is complete.
-	 * @throws {Error} If the client is not started or server returns an error.
-	 */
-	async waitForBatch(batchId: string): Promise<void> {
-		if (!this.isStarted || !this.socket) {
-			throw new Error("PlanLlama not started. Call start() first.");
-		}
+  /**
+   * Waits for a batch of jobs to complete.
+   * @param {string} batchId - The batch ID to wait for.
+   * @returns {Promise<void>} Resolves when the batch is complete.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async waitForBatch(batchId: string): Promise<void> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
 
-		return new Promise((resolve, reject) => {
-			this.socket?.emit(
-				"wait_for_batch",
-				{ batchId },
-				(response: SocketResponse) => {
-					if (response.status === "error") {
-						reject(new Error(response.error));
-					} else {
-						resolve();
-					}
-				},
-			);
-		});
-	}
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "wait_for_batch",
+        { batchId },
+        (response: SocketResponse) => {
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
 
-	/**
-	 * Retrieves a job by its ID.
-	 * @template T
-	 * @param {string} jobId - The job ID to retrieve.
-	 * @returns {Promise<Job<T>|undefined>} Resolves with the job or undefined if not found.
-	 * @throws {Error} If the client is not started or server returns an error.
-	 */
-	async getJobById<T = unknown>(jobId: string): Promise<Job<T> | undefined> {
-		if (!this.isStarted || !this.socket) {
-			throw new Error("PlanLlama not started. Call start() first.");
-		}
+  /**
+   * Retrieves a job by its ID.
+   * @template T
+   * @param {string} jobId - The job ID to retrieve.
+   * @returns {Promise<Job<T>|undefined>} Resolves with the job or undefined if not found.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async getJobById<T = unknown>(jobId: string): Promise<Job<T> | undefined> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
 
-		return new Promise((resolve, reject) => {
-			this.socket?.emit("get_job", { jobId }, (response: SocketResponse<T>) => {
-				if (response.status === "error") {
-					reject(new Error(response.error));
-				} else if (response.status === "ok") {
-					resolve(response.job);
-				} else {
-					reject(
-						new Error(
-							`Invalid response from server: ${JSON.stringify(response)}`,
-						),
-					);
-				}
-			});
-		});
-	}
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("get_job", { jobId }, (response: SocketResponse<T>) => {
+        if (response.status === "error") {
+          reject(new Error(response.error));
+        } else if (response.status === "ok") {
+          resolve(response.job);
+        } else {
+          reject(
+            new Error(
+              `Invalid response from server: ${JSON.stringify(response)}`
+            )
+          );
+        }
+      });
+    });
+  }
 
-	/**
-	 * Cancels a job by its ID.
-	 * @param {string} jobId - The job ID to cancel.
-	 * @returns {Promise<void>} Resolves when the job is cancelled.
-	 * @throws {Error} If the client is not started or server returns an error.
-	 */
-	async cancel(jobId: string): Promise<void> {
-		if (!this.isStarted || !this.socket) {
-			throw new Error("PlanLlama not started. Call start() first.");
-		}
+  /**
+   * Cancels a job by its ID.
+   * @param {string} jobId - The job ID to cancel.
+   * @returns {Promise<void>} Resolves when the job is cancelled.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async cancel(jobId: string): Promise<void> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
 
-		return new Promise((resolve, reject) => {
-			this.socket?.emit("cancel_job", { jobId }, (response: SocketResponse) => {
-				if (response.status === "error") {
-					reject(new Error(response.error));
-				} else {
-					resolve();
-				}
-			});
-		});
-	}
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("cancel_job", { jobId }, (response: SocketResponse) => {
+        if (response.status === "error") {
+          reject(new Error(response.error));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
 
-	/**
-	 * Gets the size of the job queue for a given job name.
-	 * @param {string} jobName - The name of the job queue.
-	 * @returns {Promise<number>} Resolves with the queue size.
-	 * @throws {Error} If the client is not started or server returns an error.
-	 */
-	async getQueueSize(jobName: string): Promise<number> {
-		if (!this.isStarted || !this.socket) {
-			throw new Error("PlanLlama not started. Call start() first.");
-		}
+  /**
+   * Gets the size of the job queue for a given job name.
+   * @param {string} jobName - The name of the job queue.
+   * @returns {Promise<number>} Resolves with the queue size.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async getQueueSize(jobName: string): Promise<number> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
 
-		return new Promise((resolve, reject) => {
-			this.socket?.emit(
-				"get_queue_size",
-				{ jobName },
-				(response: SocketResponse) => {
-					if (response.status === "error") {
-						reject(new Error(response.error));
-					} else if (response.status === "ok") {
-						resolve(response.queueSize || 0);
-					} else {
-						reject(new Error("Invalid response from server"));
-					}
-				},
-			);
-		});
-	}
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "get_queue_size",
+        { jobName },
+        (response: SocketResponse) => {
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else if (response.status === "ok") {
+            resolve(response.queueSize || 0);
+          } else {
+            reject(new Error("Invalid response from server"));
+          }
+        }
+      );
+    });
+  }
 }

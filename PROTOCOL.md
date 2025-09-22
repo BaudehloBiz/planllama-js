@@ -9,7 +9,7 @@ The client connects to the server using socket.io with WebSocket transport:
 ```typescript
 const socket = io(serverUrl, {
   auth: {
-    customerToken: "your-token-here",
+    apiToken: "your-token-here",
   },
   transports: ["websocket"],
 });
@@ -17,7 +17,7 @@ const socket = io(serverUrl, {
 
 ## Authentication
 
-Authentication is handled via the `customerToken` passed in the `auth` object during connection.
+Authentication is handled via the `apiToken` passed in the `auth` object during connection.
 
 ## Client-to-Server Events
 
@@ -354,7 +354,7 @@ interface BatchJob<T = unknown> {
 
 All server responses include an optional `error` field. If present, it contains a human-readable error message. Common error codes that might be included:
 
-- `INVALID_TOKEN`: The customer token is invalid
+- `INVALID_TOKEN`: The api token is invalid
 - `RATE_LIMIT_EXCEEDED`: Rate limit has been exceeded
 - `JOB_NOT_FOUND`: Requested job ID does not exist
 - `BATCH_NOT_FOUND`: Requested batch ID does not exist

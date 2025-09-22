@@ -7,326 +7,332 @@ describe("PlanLlama Integration Tests", () => {
 	let planLlama: PlanLlama;
 
 	beforeEach(async () => {
-		jest.clearAllMocks();
-		mockSocket.removeAllListeners();
-		mockSocket.connected = false;
-		mockSocket.disconnected = true;
+    jest.clearAllMocks();
+    mockSocket.removeAllListeners();
+    mockSocket.connected = false;
+    mockSocket.disconnected = true;
 
-		planLlama = new PlanLlama("test-token");
-		const connectPromise = planLlama.start();
-		mockSocket.mockConnect();
-		await connectPromise;
-	});
+    planLlama = new PlanLlama("test-token");
 
-	afterEach(async () => {
-		await planLlama.stop();
-	});
+    // Start the connection process
+    const connectPromise = planLlama.start();
 
-	it("should handle complete email workflow", async () => {
-		const completedJobs: Job[] = [];
-		const failedJobs: Job[] = [];
+    // Now trigger the mock connection
+    await mockSocket.mockConnect();
 
-		// Set up event listeners
-		planLlama.on("completed", (job) => completedJobs.push(job));
-		planLlama.on("failed", (job) => failedJobs.push(job));
+    // Wait for connection to complete
+    await connectPromise;
+  });
 
-		// Register email handler
-		planLlama.work("send-email", async (job) => {
-			const { to, subject } = job.data as { to: string; subject: string };
+  afterEach(async () => {
+    await planLlama.stop();
+  });
 
-			if (!to || !subject) {
-				throw new Error("Missing required email fields");
-			}
+  it("should handle complete email workflow", async () => {
+    const completedJobs: Job[] = [];
+    const failedJobs: Job[] = [];
 
-			// Simulate email service call
-			return {
-				messageId: `msg-${Date.now()}`,
-				to,
-				subject,
-				status: "sent",
-			};
-		});
+    // Set up event listeners
+    planLlama.on("completed", (job) => completedJobs.push(job));
+    planLlama.on("failed", (job) => failedJobs.push(job));
 
-		// Mock server response for job sending
-		mockSocket.emit.mockImplementation((event, _data, callback) => {
-			if (event === "send_job" && callback) {
-				callback({ status: "ok", jobId: "email-job-123" });
-			}
-		});
+    // Register email handler
+    planLlama.work("send-email", async (job) => {
+      const { to, subject } = job.data as { to: string; subject: string };
 
-		// Send an email job
-		const jobId = await planLlama.send("send-email", {
-			to: "user@example.com",
-			subject: "Welcome!",
-			body: "Thanks for signing up!",
-		});
+      if (!to || !subject) {
+        throw new Error("Missing required email fields");
+      }
 
-		expect(jobId).toBe("email-job-123");
+      // Simulate email service call
+      return {
+        messageId: `msg-${Date.now()}`,
+        to,
+        subject,
+        status: "sent",
+      };
+    });
 
-		// Simulate server sending work request
-		const emailJob: Job = {
-			id: "email-job-123",
-			name: "send-email",
-			data: {
-				to: "user@example.com",
-				subject: "Welcome!",
-				body: "Thanks for signing up!",
-			},
-			state: "active",
-			retryCount: 0,
-			priority: 0,
-			createdAt: new Date(),
-		};
+    // Mock server response for job sending
+    mockSocket.emit.mockImplementation((event, _data, callback) => {
+      if (event === "send_job" && callback) {
+        callback({ status: "ok", jobId: "email-job-123" });
+      }
+    });
 
-		mockSocket.mockServerEvent("work_request", emailJob);
+    // Send an email job
+    const jobId = await planLlama.send("send-email", {
+      to: "user@example.com",
+      subject: "Welcome!",
+      body: "Thanks for signing up!",
+    });
 
-		// Wait for processing
-		await new Promise((resolve) => setImmediate(resolve));
+    expect(jobId).toBe("email-job-123");
 
-		// Verify job was processed successfully
-		expect(completedJobs).toHaveLength(1);
-		expect(failedJobs).toHaveLength(0);
-		expect(completedJobs[0]?.id).toBe("email-job-123");
+    // Simulate server sending work request
+    const emailJob: Job = {
+      id: "email-job-123",
+      name: "send-email",
+      data: {
+        to: "user@example.com",
+        subject: "Welcome!",
+        body: "Thanks for signing up!",
+      },
+      state: "active",
+      retryCount: 0,
+      priority: 0,
+      createdAt: new Date(),
+    };
 
-		// Verify server communication
-		expect(mockSocket.emit).toHaveBeenCalledWith("job_started", {
-			jobName: "send-email",
-			jobId: "email-job-123",
-		});
-		expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
-			jobId: "email-job-123",
-			result: expect.objectContaining({
-				status: "sent",
-				to: "user@example.com",
-				subject: "Welcome!",
-			}),
-		});
-	});
+    mockSocket.mockServerEvent("work_request", emailJob);
 
-	it("should handle job failure and retry workflow", async () => {
-		const failedJobs: Job[] = [];
-		const retryingJobs: Job[] = [];
+    // Wait for processing
+    await new Promise((resolve) => setImmediate(resolve));
 
-		planLlama.on("failed", (job) => failedJobs.push(job));
-		planLlama.on("retrying", (job) => retryingJobs.push(job));
+    // Verify job was processed successfully
+    expect(completedJobs).toHaveLength(1);
+    expect(failedJobs).toHaveLength(0);
+    expect(completedJobs[0]?.id).toBe("email-job-123");
 
-		// Register a failing handler
-		let attemptCount = 0;
-		planLlama.work("flaky-job", async () => {
-			attemptCount++;
-			if (attemptCount < 3) {
-				throw new Error(`Attempt ${attemptCount} failed`);
-			}
-			return { success: true, attempts: attemptCount };
-		});
+    // Verify server communication
+    expect(mockSocket.emit).toHaveBeenCalledWith("job_started", {
+      jobName: "send-email",
+      jobId: "email-job-123",
+    });
+    expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
+      jobId: "email-job-123",
+      result: expect.objectContaining({
+        status: "sent",
+        to: "user@example.com",
+        subject: "Welcome!",
+      }),
+    });
+  });
 
-		// Send job with retry options
-		mockSocket.emit.mockImplementation((event, _data, callback) => {
-			if (event === "send_job" && callback) {
-				callback({ status: "ok", jobId: "flaky-job-456" });
-			}
-		});
+  it("should handle job failure and retry workflow", async () => {
+    const failedJobs: Job[] = [];
+    const retryingJobs: Job[] = [];
 
-		const jobId = await planLlama.send(
-			"flaky-job",
-			{ data: "test" },
-			{
-				retryLimit: 3,
-				retryDelay: 1,
-			},
-		);
+    planLlama.on("failed", (job) => failedJobs.push(job));
+    planLlama.on("retrying", (job) => retryingJobs.push(job));
 
-		expect(jobId).toBe("flaky-job-456");
+    // Register a failing handler
+    let attemptCount = 0;
+    planLlama.work("flaky-job", async () => {
+      attemptCount++;
+      if (attemptCount < 3) {
+        throw new Error(`Attempt ${attemptCount} failed`);
+      }
+      return { success: true, attempts: attemptCount };
+    });
 
-		// Simulate multiple work requests (original + retries)
-		const createJobAttempt = (retryCount: number): Job => ({
-			id: "flaky-job-456",
-			name: "flaky-job",
-			data: { data: "test" },
-			state: retryCount > 0 ? "retry" : "active",
-			retryCount,
-			priority: 0,
-			createdAt: new Date(),
-		});
+    // Send job with retry options
+    mockSocket.emit.mockImplementation((event, _data, callback) => {
+      if (event === "send_job" && callback) {
+        callback({ status: "ok", jobId: "flaky-job-456" });
+      }
+    });
 
-		// First attempt (fails)
-		mockSocket.mockServerEvent("work_request", createJobAttempt(0));
-		await new Promise((resolve) => setImmediate(resolve));
+    const jobId = await planLlama.send(
+      "flaky-job",
+      { data: "test" },
+      {
+        retryLimit: 3,
+        retryDelay: 1,
+      }
+    );
 
-		// Simulate retry notification
-		mockSocket.mockServerEvent("job_retrying", createJobAttempt(1));
+    expect(jobId).toBe("flaky-job-456");
 
-		// Second attempt (fails)
-		mockSocket.mockServerEvent("work_request", createJobAttempt(1));
-		await new Promise((resolve) => setImmediate(resolve));
+    // Simulate multiple work requests (original + retries)
+    const createJobAttempt = (retryCount: number): Job => ({
+      id: "flaky-job-456",
+      name: "flaky-job",
+      data: { data: "test" },
+      state: retryCount > 0 ? "retry" : "active",
+      retryCount,
+      priority: 0,
+      createdAt: new Date(),
+    });
 
-		// Third attempt (succeeds)
-		mockSocket.mockServerEvent("work_request", createJobAttempt(2));
-		await new Promise((resolve) => setImmediate(resolve));
+    // First attempt (fails)
+    mockSocket.mockServerEvent("work_request", createJobAttempt(0));
+    await new Promise((resolve) => setImmediate(resolve));
 
-		// Verify retry behavior
-		expect(failedJobs).toHaveLength(2); // First two attempts failed
-		expect(retryingJobs).toHaveLength(1); // One retry notification
-		expect(attemptCount).toBe(3); // Handler was called 3 times
-	});
+    // Simulate retry notification
+    mockSocket.mockServerEvent("job_retrying", createJobAttempt(1));
 
-	it("should handle batch processing workflow", async () => {
-		const processedJobs: string[] = [];
+    // Second attempt (fails)
+    mockSocket.mockServerEvent("work_request", createJobAttempt(1));
+    await new Promise((resolve) => setImmediate(resolve));
 
-		// Register batch processor
-		planLlama.work("batch-item", async (job) => {
-			const { id, data } = job.data as { id: string; data: string };
-			processedJobs.push(id);
+    // Third attempt (succeeds)
+    mockSocket.mockServerEvent("work_request", createJobAttempt(2));
+    await new Promise((resolve) => setImmediate(resolve));
 
-			// Simulate processing delay
-			await new Promise((resolve) => setImmediate(resolve));
+    // Verify retry behavior
+    expect(failedJobs).toHaveLength(2); // First two attempts failed
+    expect(retryingJobs).toHaveLength(1); // One retry notification
+    expect(attemptCount).toBe(3); // Handler was called 3 times
+  });
 
-			return { processed: true, id, data };
-		});
+  it("should handle batch processing workflow", async () => {
+    const processedJobs: string[] = [];
 
-		// Mock batch sending
-		mockSocket.emit.mockImplementation((event, _data, callback) => {
-			if (event === "send_batch" && callback) {
-				callback({ status: "ok", batchId: "batch-789" });
-			} else if (event === "wait_for_batch" && callback) {
-				callback({}); // TODO: have not implemented yet
-			}
-		});
+    // Register batch processor
+    planLlama.work("batch-item", async (job) => {
+      const { id, data } = job.data as { id: string; data: string };
+      processedJobs.push(id);
 
-		// Send batch
-		const batchJobs = [
-			{ name: "batch-item", data: { id: "item-1", data: "data-1" } },
-			{ name: "batch-item", data: { id: "item-2", data: "data-2" } },
-			{ name: "batch-item", data: { id: "item-3", data: "data-3" } },
-		];
+      // Simulate processing delay
+      await new Promise((resolve) => setImmediate(resolve));
 
-		const batchId = await planLlama.sendBatch(batchJobs);
-		expect(batchId).toBe("batch-789");
+      return { processed: true, id, data };
+    });
 
-		// Give worker registration time to complete
-		await new Promise((resolve) => setImmediate(resolve));
+    // Mock batch sending
+    mockSocket.emit.mockImplementation((event, _data, callback) => {
+      if (event === "send_batch" && callback) {
+        callback({ status: "ok", batchId: "batch-789" });
+      } else if (event === "wait_for_batch" && callback) {
+        callback({}); // TODO: have not implemented yet
+      }
+    });
 
-		// Simulate server sending work requests for batch items immediately
-		for (let index = 0; index < batchJobs.length; index++) {
-			const batchJob = batchJobs[index];
-			const job: Job = {
-				id: `batch-job-${index + 1}`,
-				name: batchJob.name,
-				data: batchJob.data,
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-			};
-			mockSocket.mockServerEvent("work_request", job);
-			// Small delay between jobs to allow processing
-			await new Promise((resolve) => setImmediate(resolve));
-		}
+    // Send batch
+    const batchJobs = [
+      { name: "batch-item", data: { id: "item-1", data: "data-1" } },
+      { name: "batch-item", data: { id: "item-2", data: "data-2" } },
+      { name: "batch-item", data: { id: "item-3", data: "data-3" } },
+    ];
 
-		// Wait for all jobs to be processed
-		await new Promise((resolve) => setTimeout(resolve, 50));
+    const batchId = await planLlama.sendBatch(batchJobs);
+    expect(batchId).toBe("batch-789");
 
-		// Wait for batch completion
-		await planLlama.waitForBatch(batchId);
+    // Give worker registration time to complete
+    await new Promise((resolve) => setImmediate(resolve));
 
-		// Verify all batch items were processed
-		expect(processedJobs).toHaveLength(3);
-		expect(processedJobs).toContain("item-1");
-		expect(processedJobs).toContain("item-2");
-		expect(processedJobs).toContain("item-3");
-	});
+    // Simulate server sending work requests for batch items immediately
+    for (let index = 0; index < batchJobs.length; index++) {
+      const batchJob = batchJobs[index];
+      const job: Job = {
+        id: `batch-job-${index + 1}`,
+        name: batchJob.name,
+        data: batchJob.data,
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+      };
+      mockSocket.mockServerEvent("work_request", job);
+      // Small delay between jobs to allow processing
+      await new Promise((resolve) => setImmediate(resolve));
+    }
 
-	it("should handle concurrent job processing", async () => {
-		const startTimes: Record<string, number> = {};
-		const endTimes: Record<string, number> = {};
+    // Wait for all jobs to be processed
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
-		// Register handler with concurrency options
-		planLlama.work(
-			"concurrent-job",
-			{
-				teamSize: 3,
-				teamConcurrency: 2,
-			},
-			async (job) => {
-				const jobId = job.id;
-				startTimes[jobId] = Date.now();
+    // Wait for batch completion
+    await planLlama.waitForBatch(batchId);
 
-				// Simulate work that takes some time
-				await new Promise((resolve) => setTimeout(resolve, 20));
+    // Verify all batch items were processed
+    expect(processedJobs).toHaveLength(3);
+    expect(processedJobs).toContain("item-1");
+    expect(processedJobs).toContain("item-2");
+    expect(processedJobs).toContain("item-3");
+  });
 
-				endTimes[jobId] = Date.now();
-				return { jobId, processed: true };
-			},
-		);
+  it("should handle concurrent job processing", async () => {
+    const startTimes: Record<string, number> = {};
+    const endTimes: Record<string, number> = {};
 
-		// Give worker registration time to complete
-		await new Promise((resolve) => setImmediate(resolve));
+    // Register handler with concurrency options
+    planLlama.work(
+      "concurrent-job",
+      {
+        teamSize: 3,
+        teamConcurrency: 2,
+      },
+      async (job) => {
+        const jobId = job.id;
+        startTimes[jobId] = Date.now();
 
-		// Simulate multiple concurrent work requests
-		const jobIds = [
-			"concurrent-1",
-			"concurrent-2",
-			"concurrent-3",
-			"concurrent-4",
-		];
+        // Simulate work that takes some time
+        await new Promise((resolve) => setTimeout(resolve, 20));
 
-		// Send all jobs immediately to test concurrency
-		for (const jobId of jobIds) {
-			const job: Job = {
-				id: jobId,
-				name: "concurrent-job",
-				data: { index: jobIds.indexOf(jobId) },
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-			};
-			mockSocket.mockServerEvent("work_request", job);
-		}
+        endTimes[jobId] = Date.now();
+        return { jobId, processed: true };
+      }
+    );
 
-		// Wait for all jobs to complete
-		await new Promise((resolve) => setTimeout(resolve, 100));
+    // Give worker registration time to complete
+    await new Promise((resolve) => setImmediate(resolve));
 
-		// Verify all jobs were processed
-		expect(Object.keys(startTimes)).toHaveLength(4);
-		expect(Object.keys(endTimes)).toHaveLength(4);
+    // Simulate multiple concurrent work requests
+    const jobIds = [
+      "concurrent-1",
+      "concurrent-2",
+      "concurrent-3",
+      "concurrent-4",
+    ];
 
-		// Verify concurrent execution (some jobs should overlap)
-		const sortedStarts = Object.values(startTimes).sort();
-		const sortedEnds = Object.values(endTimes).sort();
+    // Send all jobs immediately to test concurrency
+    for (const jobId of jobIds) {
+      const job: Job = {
+        id: jobId,
+        name: "concurrent-job",
+        data: { index: jobIds.indexOf(jobId) },
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+      };
+      mockSocket.mockServerEvent("work_request", job);
+    }
 
-		// With concurrency, some jobs should start before others finish
-		expect(sortedStarts[1]).toBeLessThan(sortedEnds[0]);
-	});
+    // Wait for all jobs to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-	it("should handle reconnection scenario", async () => {
-		const connectionEvents: string[] = [];
-		const errorEvents: Error[] = [];
+    // Verify all jobs were processed
+    expect(Object.keys(startTimes)).toHaveLength(4);
+    expect(Object.keys(endTimes)).toHaveLength(4);
 
-		planLlama.on("error", (error) => errorEvents.push(error));
+    // Verify concurrent execution (some jobs should overlap)
+    const sortedStarts = Object.values(startTimes).sort();
+    const sortedEnds = Object.values(endTimes).sort();
 
-		// Track connection state changes
-		const originalEmit = mockSocket.emit;
-		mockSocket.emit = jest.fn().mockImplementation((...args) => {
-			if (args[0] === "connect") connectionEvents.push("connect");
-			if (args[0] === "disconnect") connectionEvents.push("disconnect");
-			return originalEmit.apply(mockSocket, args);
-		});
+    // With concurrency, some jobs should start before others finish
+    expect(sortedStarts[1]).toBeLessThan(sortedEnds[0]);
+  });
 
-		// Simulate connection loss
-		mockSocket.mockDisconnect("io server disconnect");
+  it("should handle reconnection scenario", async () => {
+    const connectionEvents: string[] = [];
+    const errorEvents: Error[] = [];
 
-		// Wait a bit for reconnection attempt
-		await new Promise((resolve) => setImmediate(resolve));
+    planLlama.on("error", (error) => errorEvents.push(error));
 
-		// Simulate successful reconnection
-		mockSocket.mockConnect();
+    // Track connection state changes
+    const originalEmit = mockSocket.emit;
+    mockSocket.emit = jest.fn().mockImplementation((...args) => {
+      if (args[0] === "connect") connectionEvents.push("connect");
+      if (args[0] === "disconnect") connectionEvents.push("disconnect");
+      return originalEmit.apply(mockSocket, args);
+    });
 
-		// Wait for reconnection to complete
-		await new Promise((resolve) => setImmediate(resolve));
+    // Simulate connection loss
+    mockSocket.mockDisconnect("io server disconnect");
 
-		// Verify client handles reconnection
-		expect(mockSocket.disconnected).toBe(false);
-		expect(mockSocket.connected).toBe(true);
-	});
+    // Wait a bit for reconnection attempt
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Simulate successful reconnection
+    await mockSocket.mockConnect();
+
+    // Wait for reconnection to complete
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Verify client handles reconnection
+    expect(mockSocket.disconnected).toBe(false);
+    expect(mockSocket.connected).toBe(true);
+  });
 });
