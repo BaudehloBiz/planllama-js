@@ -38,8 +38,8 @@ describe("PlanLlama Performance Tests", () => {
 
 		// Send jobs in parallel
 		const sendPromises = Array.from({ length: jobCount }, (_, index) =>
-			planLlama.send("bulk-job", { index }),
-		);
+      planLlama.publish("bulk-job", { index })
+    );
 
 		const jobIds = await Promise.all(sendPromises);
 
@@ -81,14 +81,15 @@ describe("PlanLlama Performance Tests", () => {
 		// Simulate rapid work requests
 		for (let i = 0; i < jobCount; i++) {
 			const job: Job = {
-				id: `fast-job-${i}`,
-				name: "fast-job",
-				data: { index: i },
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-			};
+        id: `fast-job-${i}`,
+        name: "fast-job",
+        data: { index: i },
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        timeout: 1,
+      };
 
 			// Stagger slightly to avoid overwhelming
 			setTimeout(() => mockSocket.mockServerEvent("work_request", job), i);
@@ -153,14 +154,15 @@ describe("PlanLlama Performance Tests", () => {
 		// Send jobs with large data
 		for (let i = 0; i < jobCount; i++) {
 			const job: Job = {
-				id: `large-job-${i}`,
-				name: "large-data-job",
-				data: createLargeData(`large-job-${i}`),
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-			};
+        id: `large-job-${i}`,
+        name: "large-data-job",
+        data: createLargeData(`large-job-${i}`),
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        timeout: 1,
+      };
 
 			setTimeout(
 				() => mockSocket.mockServerEvent("work_request", job),
@@ -194,112 +196,113 @@ describe("PlanLlama Performance Tests", () => {
 	});
 
 	it("should handle event listener performance efficiently", async () => {
-		const eventCounts = {
-			completed: 0,
-			failed: 0,
-			active: 0,
-			retrying: 0,
-		};
+    const eventCounts = {
+      completed: 0,
+      failed: 0,
+      active: 0,
+      retrying: 0,
+    };
 
-		// Add multiple event listeners
-		const listenerCount = 10;
-		for (let i = 0; i < listenerCount; i++) {
-			planLlama.on("completed", () => eventCounts.completed++);
-			planLlama.on("failed", () => eventCounts.failed++);
-			planLlama.on("active", () => eventCounts.active++);
-			planLlama.on("retrying", () => eventCounts.retrying++);
-		}
+    // Add multiple event listeners
+    const listenerCount = 10;
+    for (let i = 0; i < listenerCount; i++) {
+      planLlama.on("completed", () => eventCounts.completed++);
+      planLlama.on("failed", () => eventCounts.failed++);
+      planLlama.on("active", () => eventCounts.active++);
+      planLlama.on("retrying", () => eventCounts.retrying++);
+    }
 
-		// Register job handlers
-		planLlama.work("success-job", async () => ({ success: true }));
-		planLlama.work("fail-job", async () => {
-			throw new Error("Intentional failure");
-		});
+    // Register job handlers
+    planLlama.work("success-job", async () => ({ success: true }));
+    planLlama.work("fail-job", async () => {
+      throw new Error("Intentional failure");
+    });
 
-		const jobCount = 100;
-		const startTime = Date.now();
+    const jobCount = 100;
+    const startTime = Date.now();
 
-		// Send mix of successful and failing jobs
-		for (let i = 0; i < jobCount; i++) {
-			const jobName = i % 2 === 0 ? "success-job" : "fail-job";
-			const job: Job = {
-				id: `event-job-${i}`,
-				name: jobName,
-				data: { index: i },
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-			};
+    // Send mix of successful and failing jobs
+    for (let i = 0; i < jobCount; i++) {
+      const jobName = i % 2 === 0 ? "success-job" : "fail-job";
+      const job: Job = {
+        id: `event-job-${i}`,
+        name: jobName,
+        data: { index: i },
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        timeout: 5000,
+      };
 
-			setTimeout(() => mockSocket.mockServerEvent("work_request", job), i * 10);
-		}
+      setTimeout(() => mockSocket.mockServerEvent("work_request", job), i * 10);
+    }
 
-		// Wait for all events to be processed
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Wait for all events to be processed
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		const endTime = Date.now();
-		const duration = endTime - startTime;
+    const endTime = Date.now();
+    const duration = endTime - startTime;
 
-		// Verify event handling
-		expect(eventCounts.active).toBe(jobCount * listenerCount);
-		expect(eventCounts.completed).toBe((jobCount / 2) * listenerCount);
-		expect(eventCounts.failed).toBe((jobCount / 2) * listenerCount);
+    // Verify event handling
+    expect(eventCounts.active).toBe(jobCount * listenerCount);
+    expect(eventCounts.completed).toBe((jobCount / 2) * listenerCount);
+    expect(eventCounts.failed).toBe((jobCount / 2) * listenerCount);
 
-		// Should handle events efficiently
-		expect(duration).toBeLessThan(5000);
+    // Should handle events efficiently
+    expect(duration).toBeLessThan(5000);
 
-		// Event processing should not significantly impact performance
-		const eventsPerSecond =
-			(eventCounts.active + eventCounts.completed + eventCounts.failed) /
-			(duration / 1000);
-		expect(eventsPerSecond).toBeGreaterThan(100);
-	});
+    // Event processing should not significantly impact performance
+    const eventsPerSecond =
+      (eventCounts.active + eventCounts.completed + eventCounts.failed) /
+      (duration / 1000);
+    expect(eventsPerSecond).toBeGreaterThan(100);
+  });
 
-	it("should handle concurrent connections efficiently", async () => {
-		const connectionCount = 5;
-		const planLlamas: PlanLlama[] = [];
-		const connectTimes: number[] = [];
+  it("should handle concurrent connections efficiently", async () => {
+    const connectionCount = 5;
+    const planLlamas: PlanLlama[] = [];
+    const connectTimes: number[] = [];
 
-		try {
-			// Create multiple connections
-			for (let i = 0; i < connectionCount; i++) {
-				const startTime = Date.now();
-				const testPlanLlama = new PlanLlama(`test-token-${i}`);
+    try {
+      // Create multiple connections
+      for (let i = 0; i < connectionCount; i++) {
+        const startTime = Date.now();
+        const testPlanLlama = new PlanLlama(`test-token-${i}`);
 
-				const connectPromise = testPlanLlama.start();
-				setTimeout(() => mockSocket.mockConnect(), 10);
-				await connectPromise;
+        const connectPromise = testPlanLlama.start();
+        setTimeout(() => mockSocket.mockConnect(), 10);
+        await connectPromise;
 
-				const endTime = Date.now();
-				connectTimes.push(endTime - startTime);
-				planLlamas.push(testPlanLlama);
-			}
+        const endTime = Date.now();
+        connectTimes.push(endTime - startTime);
+        planLlamas.push(testPlanLlama);
+      }
 
-			// Verify all connections established quickly
-			const avgConnectTime =
-				connectTimes.reduce((a, b) => a + b, 0) / connectTimes.length;
-			expect(avgConnectTime).toBeLessThan(100); // Under 100ms average
+      // Verify all connections established quickly
+      const avgConnectTime =
+        connectTimes.reduce((a, b) => a + b, 0) / connectTimes.length;
+      expect(avgConnectTime).toBeLessThan(100); // Under 100ms average
 
-			// Test concurrent job sending
-			const jobPromises = planLlamas.map((j, index) => {
-				mockSocket.emit.mockImplementation((event, _data, callback) => {
-					if (event === "send_job" && callback) {
-						setTimeout(
-							() => callback({ status: "ok", jobId: `concurrent-${index}` }),
-							5,
-						);
-					}
-				});
+      // Test concurrent job sending
+      const jobPromises = planLlamas.map((j, index) => {
+        mockSocket.emit.mockImplementation((event, _data, callback) => {
+          if (event === "send_job" && callback) {
+            setTimeout(
+              () => callback({ status: "ok", jobId: `concurrent-${index}` }),
+              5
+            );
+          }
+        });
 
-				return j.send("concurrent-test", { index });
-			});
+        return j.publish("concurrent-test", { index });
+      });
 
-			const jobIds = await Promise.all(jobPromises);
-			expect(jobIds).toHaveLength(connectionCount);
-		} finally {
-			// Clean up connections
-			await Promise.all(planLlamas.map((j) => j.stop()));
-		}
-	});
+      const jobIds = await Promise.all(jobPromises);
+      expect(jobIds).toHaveLength(connectionCount);
+    } finally {
+      // Clean up connections
+      await Promise.all(planLlamas.map((j) => j.stop()));
+    }
+  });
 });

@@ -9,63 +9,76 @@ export interface PlanLlamaOptions {
 }
 
 export interface JobOptions {
-	id?: string;
-	priority?: number;
-	startAfter?: Date | string;
-	expireIn?: string;
-	retryLimit?: number;
-	retryDelay?: number;
-	retryBackoff?: boolean;
-	singletonKey?: string;
+  id?: string;
+  priority?: number;
+  startAfter?: Date | string | number;
+  expireInSeconds?: number;
+  expireInMinutes?: number;
+  expireInHours?: number;
+  retryLimit?: number;
+  retryDelay?: number;
+  retryBackoff?: boolean;
+  retentionSeconds?: number;
+  retentionMinutes?: number;
+  retentionHours?: number;
+  retentionDays?: number;
+  singletonKey?: string;
+  singletonSeconds?: number;
+  singletonMinutes?: number;
+  singletonHours?: number;
+  singletonNextSlot?: boolean;
+  deadLetter?: string;
+  await?: boolean;
 }
 
 export interface WorkOptions {
-	teamSize?: number;
-	teamConcurrency?: number;
+  teamSize?: number;
+  teamConcurrency?: number;
 }
 
 export interface Job<T = unknown> {
-	id: string;
-	name: string;
-	data: T;
-	state:
-		| "created"
-		| "retry"
-		| "active"
-		| "completed"
-		| "expired"
-		| "cancelled"
-		| "failed";
-	retryCount: number;
-	priority: number;
-	createdAt: Date;
-	startedAt?: Date;
-	completedAt?: Date;
-	failedAt?: Date;
+  id: string;
+  name: string;
+  data: T;
+  state:
+    | "created"
+    | "retry"
+    | "active"
+    | "completed"
+    | "expired"
+    | "cancelled"
+    | "failed";
+  retryCount: number;
+  priority: number;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  failedAt?: Date;
+  timeout: number;
 }
 
 export interface BatchJob<T = unknown> {
-	name: string;
-	data: T;
-	options?: JobOptions;
+  name: string;
+  data: T;
+  options?: JobOptions;
 }
 
 interface SocketResponse<T = unknown> {
-	status: "ok" | "error";
-	error?: string;
-	jobId?: string;
-	scheduleId?: string;
-	batchId?: string;
-	job?: Job<T>;
-	queueSize?: number;
-	result?: T;
+  status: "ok" | "error";
+  error?: string;
+  jobId?: string;
+  scheduleId?: string;
+  batchId?: string;
+  job?: Job<T>;
+  queueSize?: number;
+  result?: T;
 }
 
 type JobHandler<T = unknown, R = unknown> = (job: Job<T>) => Promise<R>;
 
 interface HandlerInfo {
-	handler: JobHandler<unknown, unknown>;
-	options?: WorkOptions;
+  handler: JobHandler<unknown, unknown>;
+  options?: WorkOptions;
 }
 
 export class PlanLlama extends EventEmitter {
@@ -73,6 +86,7 @@ export class PlanLlama extends EventEmitter {
   private serverUrl: string;
   private socket: Socket | null = null;
   private isStarted = false;
+  private reconnecting = false;
   private jobHandlers = new Map<string, HandlerInfo>();
   // private reconnectAttempts = 0;
   // private maxReconnectAttempts = 10;
@@ -87,7 +101,8 @@ export class PlanLlama extends EventEmitter {
         throw new Error("Customer token is required");
       }
       this.apiToken = apiTokenOrOptions;
-      this.serverUrl = process.env.SERVER_URL || "http://localhost:3000";
+      this.serverUrl =
+        process.env.PLANLLAMA_SERVER_URL || "http://localhost:3000";
     } else {
       if (!apiTokenOrOptions || !apiTokenOrOptions.apiToken) {
         throw new Error("Customer options with token are required");
@@ -95,7 +110,7 @@ export class PlanLlama extends EventEmitter {
       this.apiToken = apiTokenOrOptions.apiToken;
       this.serverUrl =
         apiTokenOrOptions.serverUrl ||
-        process.env.SERVER_URL ||
+        process.env.PLANLLAMA_SERVER_URL ||
         "http://localhost:3000";
     }
   }
@@ -140,10 +155,28 @@ export class PlanLlama extends EventEmitter {
         console.log("Connected to PlanLlama server");
         this.isStarted = true;
         // this.reconnectAttempts = 0;
-        this.setupEventHandlers();
       });
 
       this.socket.on("client_ready", () => {
+        if (this.reconnecting) {
+          for (const [jobName, handlerInfo] of this.jobHandlers) {
+            console.log(`Re-registering worker for job: ${jobName}`);
+            this.socket?.emit(
+              "register_worker",
+              {
+                jobName: jobName,
+                options: handlerInfo.options,
+              },
+              (response: any) => {
+                console.log("Register worker response:", response);
+              }
+            );
+          }
+        } else {
+          this.setupEventHandlers();
+        }
+
+        this.reconnecting = true;
         resolve();
       });
 
@@ -175,9 +208,13 @@ export class PlanLlama extends EventEmitter {
 
   private setupEventHandlers(): void {
     if (!this.socket) return;
+    console.log("Setting up event handlers");
 
     // Handle incoming work requests
-    this.socket.on("work_request", async (job: Job) => {
+    this.socket.on("work_request", (job: Job, callback) => {
+      console.log(
+        `Received work request for job '${job.name}' with ID: ${job.id}`
+      );
       const handlerInfo = this.jobHandlers.get(job.name);
 
       if (!handlerInfo) {
@@ -191,19 +228,45 @@ export class PlanLlama extends EventEmitter {
 
       try {
         // Emit job started event
+        // console.log(`Starting job '${job.name}' with ID: ${job.id}`);
         this.socket?.emit("job_started", { jobName: job.name, jobId: job.id });
         super.emit("active", job);
 
         // Execute the job handler
-        const result = await handlerInfo.handler(job);
+        let isCancelled = false;
+        const timeoutId = setTimeout(() => {
+          isCancelled = true;
+          callback?.({
+            status: "error",
+            error: `Job '${job.name}' timed out after ${job.timeout}s`,
+          });
+          super.emit("failed", job, "Job timed out");
+        }, job.timeout * 1000);
 
-        // Emit job completed event
-        this.socket?.emit("job_completed", {
-          jobId: job.id,
-          result: result,
-        });
-
-        super.emit("completed", job, result);
+        handlerInfo
+          .handler(job)
+          .then((result) => {
+            if (isCancelled) return;
+            clearTimeout(timeoutId);
+            // console.log(`Job '${job.name}' completed with result:`, result);
+            this.socket?.emit("job_completed", {
+              jobName: job.name,
+              jobId: job.id,
+              result,
+            });
+            super.emit("completed", job, result);
+            callback?.({ status: "ok", result: result });
+          })
+          .catch((error) => {
+            if (isCancelled) return;
+            clearTimeout(timeoutId);
+            // console.log(`Job '${job.name}' failed with error:`, error);
+            callback?.({
+              status: "error",
+              error: error instanceof Error ? error.message : String(error),
+            });
+            super.emit("failed", job, error);
+          });
       } catch (error) {
         // Emit job failed event
         this.socket?.emit("job_failed", {
@@ -228,28 +291,6 @@ export class PlanLlama extends EventEmitter {
       super.emit("cancelled", job);
     });
   }
-
-  // private handleReconnection(): void {
-  // 	if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-  // 		console.error("Max reconnection attempts reached");
-  // 		super.emit("error", new Error("Unable to reconnect to server"));
-  // 		return;
-  // 	}
-
-  // 	this.reconnectAttempts++;
-  // 	const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000);
-
-  // 	console.log(
-  // 		`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`,
-  // 	);
-
-  // 	setTimeout(() => {
-  // 		this.start().catch((error) => {
-  // 			console.error("Reconnection failed:", error);
-  // 			this.handleReconnection();
-  // 		});
-  // 	}, delay);
-  // }
 
   /**
    * Stops the PlanLlama client and disconnects from the server.
@@ -278,7 +319,7 @@ export class PlanLlama extends EventEmitter {
    * @returns {Promise<string>} Resolves with the job ID.
    * @throws {Error} If the client is not started or server returns an error.
    */
-  async send<T = unknown>(
+  async publish<T = unknown>(
     name: string,
     data: T,
     options?: JobOptions
@@ -298,6 +339,52 @@ export class PlanLlama extends EventEmitter {
             resolve(response.jobId);
           } else {
             reject(new Error("Invalid response from server"));
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * Sends a job to the server for processing and wait for response.
+   * @template T
+   * @param {string} name - The name of the job.
+   * @param {T} data - The job data.
+   * @param {JobOptions} [options] - Optional job configuration.
+   * @returns {Promise<string>} Resolves with the job ID.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async request<T = unknown, R = unknown>(
+    name: string,
+    data: T,
+    options?: JobOptions
+  ): Promise<R> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "send_job",
+        { name, data, options: { ...options, await: true } },
+        (response: SocketResponse) => {
+          console.log("Request response:", response);
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else if (response.status === "ok" && response.jobId) {
+            this.socket?.once(
+              `job_completed_${response.jobId}`,
+              (data: any) => {
+                resolve(data);
+              }
+            );
+            this.socket?.once(`job_failed_${response.jobId}`, (data: any) => {
+              reject(new Error(data.error || "Job failed"));
+            });
+          } else {
+            reject(
+              new Error("Invalid response from server", { cause: response })
+            );
           }
         }
       );
@@ -384,16 +471,18 @@ export class PlanLlama extends EventEmitter {
         jobName: name,
         options: finalOptions,
       });
+    } else {
+      throw new Error("PlanLlama not started. Call start() first.");
     }
   }
 
   /**
    * Sends a batch of jobs to the server for processing.
-   * @param {BatchJob[]} jobs - Array of jobs to send in batch.
+   * @param {BatchJob[]} jobs - Array of jobs to publish in batch.
    * @returns {Promise<string>} Resolves with the batch ID.
    * @throws {Error} If the client is not started or server returns an error.
    */
-  async sendBatch(jobs: BatchJob[]): Promise<string> {
+  async publishBatch(jobs: BatchJob[]): Promise<string> {
     if (!this.isStarted || !this.socket) {
       throw new Error("PlanLlama not started. Call start() first.");
     }
@@ -508,6 +597,53 @@ export class PlanLlama extends EventEmitter {
             reject(new Error(response.error));
           } else if (response.status === "ok") {
             resolve(response.queueSize || 0);
+          } else {
+            reject(new Error("Invalid response from server"));
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * Requests a temporary token for browser access.
+   * @param {number} [durationSeconds] - Optional duration in seconds for the token validity.
+   * @returns {Promise<{token: string, expiresAt: string, durationSeconds: number}>} Resolves with the temporary token information.
+   * @throws {Error} If the client is not started or server returns an error.
+   */
+  async getTemporaryToken(durationSeconds?: number): Promise<{
+    token: string;
+    expiresAt: string;
+    durationSeconds: number;
+  }> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "request_browser_token",
+        { ...(durationSeconds && { durationSeconds }) },
+        (
+          response: SocketResponse & {
+            token?: string;
+            expiresAt?: string;
+            durationSeconds?: number;
+          }
+        ) => {
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else if (
+            response.status === "ok" &&
+            response.token &&
+            response.expiresAt &&
+            response.durationSeconds !== undefined
+          ) {
+            resolve({
+              token: response.token,
+              expiresAt: response.expiresAt,
+              durationSeconds: response.durationSeconds,
+            });
           } else {
             reject(new Error("Invalid response from server"));
           }

@@ -195,7 +195,7 @@ describe("PlanLlama Job Sending", () => {
       }
     });
 
-    const jobId = await planLlama.send("test-job", jobData, options);
+    const jobId = await planLlama.publish("test-job", jobData, options);
 
     expect(jobId).toBe("job-123");
     expect(mockSocket.emit).toHaveBeenCalledWith(
@@ -212,7 +212,9 @@ describe("PlanLlama Job Sending", () => {
       }
     });
 
-    await expect(planLlama.send("test-job", {})).rejects.toThrow("Job failed");
+    await expect(planLlama.publish("test-job", {})).rejects.toThrow(
+      "Job failed"
+    );
   });
 
   it("should handle invalid response from server", async () => {
@@ -222,7 +224,7 @@ describe("PlanLlama Job Sending", () => {
       }
     });
 
-    await expect(planLlama.send("test-job", {})).rejects.toThrow(
+    await expect(planLlama.publish("test-job", {})).rejects.toThrow(
       "Invalid response from server"
     );
   });
@@ -230,7 +232,7 @@ describe("PlanLlama Job Sending", () => {
   it("should throw error when not connected", async () => {
     await planLlama.stop();
 
-    await expect(planLlama.send("test-job", {})).rejects.toThrow(
+    await expect(planLlama.publish("test-job", {})).rejects.toThrow(
       "PlanLlama not started. Call start() first."
     );
   });
@@ -351,6 +353,7 @@ describe("PlanLlama Work Registration", () => {
       retryCount: 0,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
     // Simulate incoming work request
@@ -366,6 +369,7 @@ describe("PlanLlama Work Registration", () => {
     });
     expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
       jobId: "job-123",
+      jobName: "test-job",
       result: { success: true },
     });
     expect(completedHandler).toHaveBeenCalledWith(mockJob, { success: true });
@@ -386,17 +390,19 @@ describe("PlanLlama Work Registration", () => {
       retryCount: 0,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
+    const mockCallback = jest.fn();
     // Simulate incoming work request
-    mockSocket.mockServerEvent("work_request", mockJob);
+    mockSocket.mockServerEvent("work_request", mockJob, mockCallback);
 
     // Wait for async processing
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(handler).toHaveBeenCalledWith(mockJob);
-    expect(mockSocket.emit).toHaveBeenCalledWith("job_failed", {
-      jobId: "job-123",
+    expect(mockCallback).toHaveBeenCalledWith({
+      status: "error",
       error: "Processing failed",
     });
     expect(failedHandler).toHaveBeenCalledWith(mockJob, expect.any(Error));
@@ -411,6 +417,7 @@ describe("PlanLlama Work Registration", () => {
       retryCount: 0,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
     // Simulate incoming work request
@@ -452,7 +459,7 @@ describe("PlanLlama Batch Operations", () => {
       }
     });
 
-    const batchId = await planLlama.sendBatch(jobs);
+    const batchId = await planLlama.publishBatch(jobs);
 
     expect(batchId).toBe("batch-789");
     expect(mockSocket.emit).toHaveBeenCalledWith(
@@ -485,7 +492,7 @@ describe("PlanLlama Batch Operations", () => {
       }
     });
 
-    await expect(planLlama.sendBatch([])).rejects.toThrow("Batch failed");
+    await expect(planLlama.publishBatch([])).rejects.toThrow("Batch failed");
   });
 });
 
@@ -512,6 +519,7 @@ describe("PlanLlama Job Management", () => {
       retryCount: 0,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
     mockSocket.emit.mockImplementation((event, _data, callback) => {
@@ -604,6 +612,7 @@ describe("PlanLlama Event Handling", () => {
       retryCount: 1,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
     mockSocket.mockServerEvent("job_retrying", mockJob);
@@ -623,6 +632,7 @@ describe("PlanLlama Event Handling", () => {
       retryCount: 0,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
     mockSocket.mockServerEvent("job_expired", mockJob);
@@ -642,6 +652,7 @@ describe("PlanLlama Event Handling", () => {
       retryCount: 0,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
     mockSocket.mockServerEvent("job_cancelled", mockJob);

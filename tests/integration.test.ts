@@ -61,7 +61,7 @@ describe("PlanLlama Integration Tests", () => {
     });
 
     // Send an email job
-    const jobId = await planLlama.send("send-email", {
+    const jobId = await planLlama.publish("send-email", {
       to: "user@example.com",
       subject: "Welcome!",
       body: "Thanks for signing up!",
@@ -82,6 +82,7 @@ describe("PlanLlama Integration Tests", () => {
       retryCount: 0,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     };
 
     mockSocket.mockServerEvent("work_request", emailJob);
@@ -101,6 +102,7 @@ describe("PlanLlama Integration Tests", () => {
     });
     expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
       jobId: "email-job-123",
+      jobName: "send-email",
       result: expect.objectContaining({
         status: "sent",
         to: "user@example.com",
@@ -133,7 +135,7 @@ describe("PlanLlama Integration Tests", () => {
       }
     });
 
-    const jobId = await planLlama.send(
+    const jobId = await planLlama.publish(
       "flaky-job",
       { data: "test" },
       {
@@ -153,6 +155,7 @@ describe("PlanLlama Integration Tests", () => {
       retryCount,
       priority: 0,
       createdAt: new Date(),
+      timeout: 1,
     });
 
     // First attempt (fails)
@@ -206,7 +209,7 @@ describe("PlanLlama Integration Tests", () => {
       { name: "batch-item", data: { id: "item-3", data: "data-3" } },
     ];
 
-    const batchId = await planLlama.sendBatch(batchJobs);
+    const batchId = await planLlama.publishBatch(batchJobs);
     expect(batchId).toBe("batch-789");
 
     // Give worker registration time to complete
@@ -223,6 +226,7 @@ describe("PlanLlama Integration Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
       mockSocket.mockServerEvent("work_request", job);
       // Small delay between jobs to allow processing
@@ -286,6 +290,7 @@ describe("PlanLlama Integration Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
       mockSocket.mockServerEvent("work_request", job);
     }

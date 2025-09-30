@@ -119,7 +119,7 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         // No callback called
       });
 
-      const _sendPromise = planLlama.send("timeout-job", {});
+      const _sendPromise = planLlama.publish("timeout-job", {});
 
       // This will hang indefinitely in real scenario
       // In test, we'll just verify the call was made
@@ -138,7 +138,7 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         }
       });
 
-      await expect(planLlama.send("test-job", {})).rejects.toThrow(
+      await expect(planLlama.publish("test-job", {})).rejects.toThrow(
         "Invalid response from server"
       );
     });
@@ -151,12 +151,12 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
       });
 
       // Should handle null data
-      await expect(planLlama.send("test-job", null)).resolves.toBe(
+      await expect(planLlama.publish("test-job", null)).resolves.toBe(
         "null-data-job"
       );
 
       // Should handle undefined data
-      await expect(planLlama.send("test-job", undefined)).resolves.toBe(
+      await expect(planLlama.publish("test-job", undefined)).resolves.toBe(
         "null-data-job"
       );
     });
@@ -176,7 +176,7 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         }
       });
 
-      await expect(planLlama.send("large-job", largePayload)).resolves.toBe(
+      await expect(planLlama.publish("large-job", largePayload)).resolves.toBe(
         "large-payload-job"
       );
     });
@@ -192,9 +192,9 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
       });
 
       // Should not throw when sending circular data (JSON.stringify might fail, but that's server-side)
-      await expect(planLlama.send("circular-job", circularData)).resolves.toBe(
-        "circular-job"
-      );
+      await expect(
+        planLlama.publish("circular-job", circularData)
+      ).resolves.toBe("circular-job");
     });
   });
 
@@ -223,14 +223,17 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
 
-      mockSocket.mockServerEvent("work_request", mockJob);
+      const mockCallback = jest.fn();
+
+      mockSocket.mockServerEvent("work_request", mockJob, mockCallback);
 
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(mockSocket.emit).toHaveBeenCalledWith("job_failed", {
-        jobId: "weird-error-123",
+      expect(mockCallback).toHaveBeenCalledWith({
+        status: "error",
         error: "string error",
       });
     });
@@ -248,14 +251,16 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
 
-      mockSocket.mockServerEvent("work_request", mockJob);
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
         jobId: "undefined-result-123",
+        jobName: "undefined-result-job",
         result: undefined,
       });
     });
@@ -276,9 +281,10 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
 
-      mockSocket.mockServerEvent("work_request", mockJob);
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
       // Wait a reasonable time
       await new Promise((resolve) => setImmediate(resolve));
@@ -309,7 +315,7 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         data: { test: "data" },
       } as unknown as Job;
 
-      mockSocket.mockServerEvent("work_request", malformedJob);
+      mockSocket.mockServerEvent("work_request", malformedJob, () => {});
 
       await new Promise((resolve) => setImmediate(resolve));
 
@@ -338,9 +344,10 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
 
-      mockSocket.mockServerEvent("work_request", mockJob);
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
       await new Promise((resolve) => setImmediate(resolve));
 
@@ -351,6 +358,7 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
       });
       expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
         jobId: "deep-nested-123",
+        jobName: "deep-nested-job",
         result: { processed: true, jobId: "deep-nested-123" },
       });
     });
@@ -384,9 +392,10 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
 
-      mockSocket.mockServerEvent("work_request", mockJob);
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
       await new Promise((resolve) => setImmediate(resolve));
 
@@ -422,9 +431,10 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
           retryCount: 0,
           priority: 0,
           createdAt: new Date(),
+          timeout: 1,
         };
 
-        mockSocket.mockServerEvent("work_request", mockJob);
+        mockSocket.mockServerEvent("work_request", mockJob, () => {});
         await new Promise((resolve) => setImmediate(resolve));
       }
 
@@ -484,10 +494,11 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
+        timeout: 1,
       };
 
       // Start job processing by emitting the work_request event
-      mockSocket.mockServerEvent("work_request", mockJob);
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
       // Wait for job to start
       await new Promise((resolve) => setTimeout(resolve, 10));
