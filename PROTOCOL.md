@@ -1,6 +1,6 @@
 # PlanLlama Socket.IO Protocol
 
-This document describes the socket.io protocol used by the PlanLlama client to communicate with the PlanLlama server.
+This document describes the socket.io protocol used by the PlanLlama client to communicate with the PlanLlama server. It is kept in sync with the TypeScript client (`src/client.ts`). Where there are differences between earlier README examples and this document, this document is authoritative.
 
 ## Connection
 
@@ -31,7 +31,7 @@ Send a job to be processed immediately or at a scheduled time.
 {
   name: string;
   data: any;
-  options?: JobOptions;
+  options?: JobOptions & { await?: boolean }; // await=true requests inline response events
 }
 ```
 
@@ -40,10 +40,21 @@ Send a job to be processed immediately or at a scheduled time.
 ```typescript
 {
   status: RequestStatus;
-  jobId?: string;
+  jobId?: string; // Returned when status==='ok'
   error?: string;
 }
 ```
+
+When `options.await === true` the server MUST additionally emit exactly one of the dynamic events:
+
+```text
+job_completed_<jobId>
+job_failed_<jobId>
+```
+
+`job_completed_<jobId>` payload SHOULD be the job result value directly (the client treats it as `any`).
+
+`job_failed_<jobId>` payload SHOULD be `{ error: string }`.
 
 ### `schedule_job`
 
@@ -65,7 +76,7 @@ Schedule a recurring job using cron pattern.
 ```typescript
 {
   status: RequestStatus;
-  scheduleId?: string;
+  scheduleId?: string; // Optional; client currently ignores
   error?: string;
 }
 ```
@@ -121,6 +132,7 @@ Wait for a batch to complete.
 
 ```typescript
 {
+  status: RequestStatus;
   error?: string;
 }
 ```
@@ -199,6 +211,7 @@ Acknowledge that a job has started processing.
 ```typescript
 {
   jobId: string;
+  jobName?: string; // Client currently sends { jobName, jobId }
 }
 ```
 
@@ -211,6 +224,7 @@ Report that a job has completed successfully.
 ```typescript
 {
   jobId: string;
+  jobName?: string; // Client includes jobName when emitting
   result?: any;
 }
 ```
@@ -228,7 +242,37 @@ Report that a job has failed.
 }
 ```
 
+Note: The current client emits `job_failed` only for certain failure paths (e.g. missing handler or synchronous exceptions) and relies on callback-based error propagation for handler promise rejections.
+
+### `request_browser_token`
+
+Request a temporary browser token (used by `getTemporaryToken()` in the client).
+
+**Payload:**
+
+```typescript
+{
+  durationSeconds?: number; // Optional validity duration
+}
+```
+
+**Response:**
+
+```typescript
+{
+  status: RequestStatus;
+  token?: string;
+  expiresAt?: string; // ISO timestamp
+  durationSeconds?: number; // Echoed / normalized duration
+  error?: string;
+}
+```
+
 ## Server-to-Client Events
+
+### `client_ready`
+
+Sent by the server after the low-level socket connection is established and the client is authenticated. The PlanLlama client waits for this event before resolving `start()`. On reconnection it triggers re-registration of previously registered workers.
 
 ### `work_request`
 
@@ -262,6 +306,26 @@ Job;
 
 ### `job_cancelled`
 
+### `job_completed_<jobId>` (dynamic)
+
+Emitted only when a job was submitted with `{ options: { await: true } }`.
+
+**Payload:**
+
+```typescript
+any; // The job result value directly
+```
+
+### `job_failed_<jobId>` (dynamic)
+
+Paired with awaited jobs indicating failure.
+
+**Payload:**
+
+```typescript
+{ error: string }
+```
+
 Server notifies that a job has been cancelled.
 
 **Payload:**
@@ -288,36 +352,62 @@ interface Job<T = unknown> {
   id: string;
   name: string;
   data: T;
-  state:
-    | "created"
-    | "retry"
-    | "active"
-    | "completed"
-    | "expired"
-    | "cancelled"
-    | "failed";
+  state: "created" | "retry" | "active" | "completed" | "expired" | "cancelled" | "failed";
   retryCount: number;
   priority: number;
-  createdAt: Date;
+  createdAt: Date; // May be serialized as ISO string over the wire
   startedAt?: Date;
   completedAt?: Date;
   failedAt?: Date;
+  timeout: number; // Seconds allowed for processing; client enforces local timeout
 }
 ```
 
 ### JobOptions
 
+The current client supports granular expiry, retention, and singleton window configuration. Older consolidated fields (e.g. `expireIn`) are superseded by explicit unit-based options.
+
 ```typescript
 interface JobOptions {
   id?: string;
   priority?: number;
-  startAfter?: Date | string;
-  expireIn?: string;
+  startAfter?: Date | string | number; // number = epoch ms or seconds (server-defined)
+
+  // Expiration (choose one or combine; server will interpret precedence):
+  expireInSeconds?: number;
+  expireInMinutes?: number;
+  expireInHours?: number;
+
+  // Retry behavior:
   retryLimit?: number;
-  retryDelay?: number;
-  retryBackoff?: boolean;
-  singletonKey?: string;
+  retryDelay?: number; // Seconds
+  retryBackoff?: boolean; // Enables exponential backoff if true
+
+  // Retention (how long to keep completed/failed job data):
+  retentionSeconds?: number;
+  retentionMinutes?: number;
+  retentionHours?: number;
+  retentionDays?: number;
+
+  // Singleton controls:
+  singletonKey?: string; // Uniqueness key
+  singletonSeconds?: number;
+  singletonMinutes?: number;
+  singletonHours?: number;
+  singletonNextSlot?: boolean; // If occupied, enqueue for next available slot
+
+  // Dead letter queue name / routing key:
+  deadLetter?: string;
+
+  // Inline response request (dynamic completion events):
+  await?: boolean; // When true, server should emit job_completed_<id> / job_failed_<id>
 }
+```
+
+Deprecated / legacy field (still accepted server-side if supported):
+
+```typescript
+// expireIn?: string; // e.g. "5m", "2h" (legacy). Prefer granular unit fields above.
 ```
 
 ### WorkOptions
@@ -329,16 +419,9 @@ interface WorkOptions {
 }
 ```
 
-### QueueSize
+### Queue Size
 
-```typescript
-interface QueueSize {
-  waiting: number;
-  active: number;
-  completed: number;
-  failed: number;
-}
-```
+`get_queue_size` currently returns a single numeric `queueSize` (total waiting) in its response. The earlier structured object format is not used by the client at present. If extended stats are required in the future, they should be added under distinct keys to preserve backward compatibility.
 
 ### BatchJob
 
@@ -364,11 +447,19 @@ All server responses include an optional `error` field. If present, it contains 
 
 The client also handles standard socket.io connection events:
 
-- `connect`: Successfully connected to server
+- `connect`: Low-level socket connected
+- `client_ready`: Server indicates client may proceed (auth + initialization complete)
 - `disconnect`: Disconnected from server
 - `connect_error`: Failed to connect to server
 - `error`: General socket error
 
 ## Reconnection
 
-The client automatically handles reconnection with exponential backoff up to a maximum of 10 attempts.
+On reconnect the client waits for `client_ready` then re-registers all previously registered workers by emitting `register_worker` for each. Any sophisticated exponential backoff logic is currently minimal in the client (further enhancements may add deterministic backoff + testing harness).
+
+## Versioning / Compatibility Notes
+
+- The introduction of granular `expireIn*`, `retention*`, and `singleton*` fields is additive; older `expireIn` may still be honored by the server but should be considered deprecated in docs.
+- Dynamic events `job_completed_<id>` / `job_failed_<id>` are only emitted for jobs published with `await: true`.
+- `timeout` is enforced client-side; server should still enforce authoritative limits.
+
