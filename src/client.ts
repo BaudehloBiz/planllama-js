@@ -660,7 +660,7 @@ export class PlanLlama extends EventEmitter {
     });
   }
 
-  async fetchCurrentStepResults(jobId: string): Promise<StepResult> {
+  private async fetchCurrentStepResults(jobId: string): Promise<StepResult> {
     if (!this.isStarted || !this.socket) {
       throw new Error("PlanLlama not started. Call start() first.");
     }
@@ -683,7 +683,7 @@ export class PlanLlama extends EventEmitter {
     });
   }
 
-  async storeStepResult(
+  private async storeStepResult(
     jobId: string,
     stepName: string,
     result: any
