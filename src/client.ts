@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import type { Socket } from "socket.io-client";
@@ -740,9 +741,10 @@ export class PlanLlama extends EventEmitter {
 
     // Now setup the workflow runner
     this.work(name, async (job) => {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
       const numTasks = Object.keys(steps).length;
-      let stepResults = await this.fetchCurrentStepResults(job.id);
+      const stepResults = await this.fetchCurrentStepResults(job.id);
 
       let nextSteps: string[] = [];
       let pendingSteps: Record<string, DependantStep> = {};

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Job, StepResult, Steps } from "../src/client";
 import { PlanLlama } from "../src/client";
 import { mockSocket } from "./__mocks__/socket.io-client";
@@ -48,7 +49,8 @@ describe("PlanLlama Workflow Tests", () => {
     if (planLlama) {
       try {
         await planLlama.stop();
-      } catch (_error) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
         // Ignore cleanup errors
       }
     }
@@ -154,7 +156,7 @@ describe("PlanLlama Workflow Tests", () => {
 
       // Mock fetch_step_results to return empty results
       mockSocket.emit.mockImplementation(
-        (event: string, data: any, callback?: any) => {
+        (event: string, _data: any, callback?: any) => {
           if (event === "fetch_step_results") {
             callback?.({ status: "ok", stepResults: {} });
           }
@@ -200,7 +202,7 @@ describe("PlanLlama Workflow Tests", () => {
       const mockCallback = jest.fn();
 
       mockSocket.emit.mockImplementation(
-        (event: string, data: any, callback?: any) => {
+        (event: string, _data: any, callback?: any) => {
           if (event === "fetch_step_results") {
             callback?.({ status: "ok", stepResults: {} });
           }
@@ -255,7 +257,7 @@ describe("PlanLlama Workflow Tests", () => {
       const mockCallback = jest.fn();
 
       mockSocket.emit.mockImplementation(
-        (event: string, data: any, callback?: any) => {
+        (event: string, _data: any, callback?: any) => {
           if (event === "fetch_step_results") {
             callback?.({ status: "ok", stepResults: {} });
           }
@@ -300,7 +302,7 @@ describe("PlanLlama Workflow Tests", () => {
     it("should execute individual step when triggered", async () => {
       let executedValue: string | undefined;
       const steps: Steps = {
-        step1: async (results?: StepResult) => {
+        step1: async () => {
           executedValue = "step1-executed";
           return "result1";
         },
@@ -319,7 +321,7 @@ describe("PlanLlama Workflow Tests", () => {
         timeout: 900,
       };
 
-      const mockCallback = jest.fn((response: any) => {
+      const mockCallback = jest.fn((response) => {
         expect(response.status).toBe("ok");
         expect(response.result).toBe("result1");
       });
