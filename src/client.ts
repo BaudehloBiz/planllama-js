@@ -8,6 +8,12 @@ export interface PlanLlamaOptions {
   serverUrl?: string;
 }
 
+export type SingleStep = (result?: StepResult) => Promise<any>;
+export type StepResult = Record<string, any>;
+export type DependantStep = [...string[], (result: StepResult) => Promise<any>];
+export type StepInstance = SingleStep | DependantStep;
+export type Steps = Record<string, StepInstance>;
+
 export interface JobOptions {
   id?: string;
   priority?: number;
@@ -233,6 +239,7 @@ export class PlanLlama extends EventEmitter {
         super.emit("active", job);
 
         // Execute the job handler
+        job.timeout ||= 900; // Default timeout of 15 minutes
         let isCancelled = false;
         const timeoutId = setTimeout(() => {
           isCancelled = true;
@@ -356,7 +363,7 @@ export class PlanLlama extends EventEmitter {
    */
   async request<T = unknown, R = unknown>(
     name: string,
-    data: T,
+    data?: T,
     options?: JobOptions
   ): Promise<R> {
     if (!this.isStarted || !this.socket) {
@@ -649,6 +656,211 @@ export class PlanLlama extends EventEmitter {
           }
         }
       );
+    });
+  }
+
+  async fetchCurrentStepResults(jobId: string): Promise<StepResult> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
+
+    console.log(`Fetching current step results for job ID: ${jobId}`);
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "fetch_step_results",
+        { jobId },
+        (response: SocketResponse & { stepResults?: StepResult }) => {
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else if (response.status === "ok" && response.stepResults) {
+            resolve(new Map(Object.entries(response.stepResults)));
+          } else {
+            reject(new Error("Invalid response from server"));
+          }
+        }
+      );
+    });
+  }
+
+  async storeStepResult(
+    jobId: string,
+    stepName: string,
+    result: any
+  ): Promise<void> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
+
+    console.log(`Storing result for step '${stepName}' of job ID: ${jobId}`);
+    return new Promise((resolve, reject) => {
+      this.socket?.emit(
+        "store_step_result",
+        { jobId, stepName, result },
+        (response: SocketResponse) => {
+          if (response.status === "error") {
+            reject(new Error(response.error));
+          } else if (response.status === "ok") {
+            resolve();
+          } else {
+            reject(new Error("Invalid response from server"));
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * Defines and runs a workflow with multiple dependent steps.
+   * @param {string} name - The name of the workflow.
+   * @param {Steps} steps - A map of step names to step functions or dependant steps.
+   * @returns {Promise<void>} Resolves when the workflow is defined.
+   * @throws {Error} If the client is not started or step definitions are invalid.
+   */
+
+  async workflow(name: string, steps: Steps): Promise<void> {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
+
+    // Setup each step as its own job handler
+    for (const [stepName, step] of Object.entries(steps)) {
+      if (typeof step !== "function" && !Array.isArray(step)) {
+        throw new Error("Invalid step definition");
+      }
+      const func = typeof step === "function" ? step : step[step.length - 1];
+      if (typeof func !== "function") {
+        throw new Error(
+          "Step must be a function or an array ending with a function"
+        );
+      }
+      this.work(`${name}/${stepName}`, async (job: Job) => {
+        return func(job.data as StepResult);
+      });
+    }
+
+    // Now setup the workflow runner
+    this.work(name, async (job) => {
+      const self = this;
+      const numTasks = Object.keys(steps).length;
+      let stepResults = await this.fetchCurrentStepResults(job.id);
+
+      let nextSteps: string[] = [];
+      let pendingSteps: Record<string, DependantStep> = {};
+
+      cycleCheck();
+      getNextSteps(steps);
+      return runSteps();
+
+      function getNextSteps(_steps: Steps) {
+        nextSteps = [];
+        pendingSteps = {};
+
+        for (const [stepName, step] of Object.entries(_steps)) {
+          if (stepResults.has(stepName)) {
+            // console.log(`Step '${stepName}' already completed, skipping`);
+            continue;
+          }
+          // Sort into nextSteps based on dependencies
+          if (typeof step === "function") {
+            nextSteps.push(stepName);
+          } else if (Array.isArray(step)) {
+            const dependencies = step.slice(0, -1) as string[];
+            const allDepsMet = dependencies.every((dep) => dep in stepResults);
+            if (allDepsMet) {
+              nextSteps.push(stepName);
+            } else {
+              pendingSteps[stepName] = step;
+            }
+          }
+        }
+      }
+
+      function cycleCheck() {
+        // Build in-degree map and dependents graph for Kahn's algorithm
+        const inDegree: Record<string, number> = {};
+        const dependents: Record<string, string[]> = {};
+
+        // Initialize all steps with in-degree 0 and empty dependents
+        for (const stepName of Object.keys(steps)) {
+          inDegree[stepName] = 0;
+          dependents[stepName] = [];
+        }
+
+        // Calculate in-degrees and build dependents map
+        for (const [stepName, step] of Object.entries(steps)) {
+          if (Array.isArray(step)) {
+            const dependencies = step.slice(0, -1) as string[];
+            inDegree[stepName] = dependencies.length;
+
+            // For each dependency, add this step as a dependent
+            for (const dep of dependencies) {
+              if (!steps[dep]) {
+                throw new Error(
+                  `Step '${stepName}' depends on undefined step '${dep}'`
+                );
+              }
+              if (!dependents[dep]) {
+                dependents[dep] = [];
+              }
+              dependents[dep].push(stepName);
+            }
+          }
+        }
+
+        // Kahn's algorithm: start with nodes that have no dependencies
+        const queue: string[] = [];
+        for (const [stepName, degree] of Object.entries(inDegree)) {
+          if (degree === 0) {
+            queue.push(stepName);
+          }
+        }
+
+        let processedCount = 0;
+
+        while (queue.length > 0) {
+          const currentStep = queue.shift() as string;
+          processedCount++;
+
+          // Process all steps that depend on this step
+          for (const dependent of dependents[currentStep] || []) {
+            if (inDegree[dependent] !== undefined) {
+              inDegree[dependent]--;
+              if (inDegree[dependent] === 0) {
+                queue.push(dependent);
+              }
+            }
+          }
+        }
+
+        // If we didn't process all steps, there's a cycle
+        if (processedCount !== numTasks) {
+          throw new Error(
+            "workflow() cannot execute steps due to a recursive dependency"
+          );
+        }
+      }
+
+      async function runSteps() {
+        if (nextSteps.length === 0) {
+          return stepResults;
+        }
+
+        const stepPromises = nextSteps.map((s) => runStep(s));
+
+        await Promise.all(stepPromises);
+
+        getNextSteps(pendingSteps);
+        return runSteps();
+      }
+
+      async function runStep(stepName: string) {
+        const result = await self.request<StepResult, any>(
+          `${name}/${stepName}`,
+          stepResults
+        );
+        stepResults[stepName] = result;
+        self.storeStepResult(job.id, stepName, result);
+      }
     });
   }
 }

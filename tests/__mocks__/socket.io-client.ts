@@ -58,6 +58,9 @@ export class MockSocketInstance extends EventEmitter implements MockSocket {
       "job_started",
       "job_completed",
       "job_failed",
+      "fetch_step_results",
+      "store_step_result",
+      "request_browser_token",
     ];
     return clientServerEvents.includes(event);
   }
