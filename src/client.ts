@@ -61,7 +61,7 @@ export interface Job<T = unknown> {
   startedAt?: Date;
   completedAt?: Date;
   failedAt?: Date;
-  timeout: number;
+  expireInSeconds: number;
 }
 
 export interface BatchJob<T = unknown> {
@@ -240,16 +240,16 @@ export class PlanLlama extends EventEmitter {
         super.emit("active", job);
 
         // Execute the job handler
-        job.timeout ||= 900; // Default timeout of 15 minutes
+        job.expireInSeconds ||= 900; // Default timeout of 15 minutes
         let isCancelled = false;
         const timeoutId = setTimeout(() => {
           isCancelled = true;
           callback?.({
             status: "error",
-            error: `Job '${job.name}' timed out after ${job.timeout}s`,
+            error: `Job '${job.name}' timed out after ${job.expireInSeconds}s`,
           });
           super.emit("failed", job, "Job timed out");
-        }, job.timeout * 1000);
+        }, job.expireInSeconds * 1000);
 
         handlerInfo
           .handler(job)
@@ -356,10 +356,11 @@ export class PlanLlama extends EventEmitter {
   /**
    * Sends a job to the server for processing and wait for response.
    * @template T
+   * @template R
    * @param {string} name - The name of the job.
    * @param {T} data - The job data.
    * @param {JobOptions} [options] - Optional job configuration.
-   * @returns {Promise<string>} Resolves with the job ID.
+   * @returns {Promise<R>} Resolves with the return value of the job worker.
    * @throws {Error} If the client is not started or server returns an error.
    */
   async request<T = unknown, R = unknown>(
@@ -380,15 +381,24 @@ export class PlanLlama extends EventEmitter {
           if (response.status === "error") {
             reject(new Error(response.error));
           } else if (response.status === "ok" && response.jobId) {
-            this.socket?.once(
-              `job_completed_${response.jobId}`,
-              (data: any) => {
-                resolve(data);
-              }
-            );
-            this.socket?.once(`job_failed_${response.jobId}`, (data: any) => {
+            // eslint-disable-next-line prefer-const
+            let jobFailed: (data: any) => void;
+            const jobSuccess = (data: R) => {
+              this.socket?.removeListener(
+                `job_failed_${response.jobId}`,
+                jobFailed
+              );
+              resolve(data);
+            };
+            jobFailed = (data: any) => {
+              this.socket?.removeListener(
+                `job_completed_${response.jobId}`,
+                jobSuccess
+              );
               reject(new Error(data.error || "Job failed"));
-            });
+            };
+            this.socket?.once(`job_completed_${response.jobId}`, jobSuccess);
+            this.socket?.once(`job_failed_${response.jobId}`, jobFailed);
           } else {
             reject(
               new Error("Invalid response from server", { cause: response })
@@ -455,6 +465,10 @@ export class PlanLlama extends EventEmitter {
     optionsOrHandler: WorkOptions | JobHandler<T, R>,
     handler?: JobHandler<T, R>
   ): void {
+    if (!this.isStarted || !this.socket) {
+      throw new Error("PlanLlama not started. Call start() first.");
+    }
+
     let finalHandler: JobHandler<unknown, unknown>;
     let finalOptions: WorkOptions | undefined;
 
@@ -473,15 +487,10 @@ export class PlanLlama extends EventEmitter {
       ...(finalOptions && { options: finalOptions }),
     });
 
-    // Register worker with server
-    if (this.isStarted && this.socket) {
-      this.socket.emit("register_worker", {
-        jobName: name,
-        options: finalOptions,
-      });
-    } else {
-      throw new Error("PlanLlama not started. Call start() first.");
-    }
+    this.socket.emit("register_worker", {
+      jobName: name,
+      options: finalOptions,
+    });
   }
 
   /**

@@ -149,7 +149,7 @@ describe("PlanLlama Workflow Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
-        timeout: 900,
+        expireInSeconds: 900,
       };
 
       const mockCallback = jest.fn();
@@ -196,7 +196,7 @@ describe("PlanLlama Workflow Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
-        timeout: 900,
+        expireInSeconds: 900,
       };
 
       const mockCallback = jest.fn();
@@ -251,7 +251,7 @@ describe("PlanLlama Workflow Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
-        timeout: 900,
+        expireInSeconds: 900,
       };
 
       const mockCallback = jest.fn();
@@ -318,7 +318,7 @@ describe("PlanLlama Workflow Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
-        timeout: 900,
+        expireInSeconds: 900,
       };
 
       const mockCallback = jest.fn((response) => {
@@ -359,7 +359,7 @@ describe("PlanLlama Workflow Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
-        timeout: 900,
+        expireInSeconds: 900,
       };
 
       const mockCallback = jest.fn();
@@ -414,7 +414,7 @@ describe("PlanLlama Workflow Tests", () => {
         retryCount: 0,
         priority: 0,
         createdAt: new Date(),
-        timeout: 900,
+        expireInSeconds: 900,
       };
 
       const mockCallback = jest.fn();
