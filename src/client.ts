@@ -3,6 +3,11 @@ import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
+import { debuglog, DebugLogger } from "node:util";
+
+let log = debuglog("planllama", (debug) => {
+  log = debug as DebugLogger;
+});
 
 export interface PlanLlamaOptions {
   apiToken: string;
@@ -159,7 +164,7 @@ export class PlanLlama extends EventEmitter {
 
       this.socket.on("connect", () => {
         clearTimeout(connectionTimeout);
-        console.log("Connected to PlanLlama server");
+        log("Connected to PlanLlama server");
         this.isStarted = true;
         // this.reconnectAttempts = 0;
       });
@@ -167,7 +172,7 @@ export class PlanLlama extends EventEmitter {
       this.socket.on("client_ready", () => {
         if (this.reconnecting) {
           for (const [jobName, handlerInfo] of this.jobHandlers) {
-            console.log(`Re-registering worker for job: ${jobName}`);
+            log(`Re-registering worker for job: ${jobName}`);
             this.socket?.emit(
               "register_worker",
               {
@@ -175,7 +180,7 @@ export class PlanLlama extends EventEmitter {
                 options: handlerInfo.options,
               },
               (response: any) => {
-                console.log("Register worker response:", response);
+                log("Register worker response:", response);
               }
             );
           }
@@ -197,7 +202,7 @@ export class PlanLlama extends EventEmitter {
       });
 
       this.socket.on("disconnect", (reason) => {
-        console.log("Disconnected from PlanLlama server:", reason);
+        log("Disconnected from PlanLlama server:", reason);
         this.isStarted = false;
 
         // if (reason === "io server disconnect") {
@@ -215,13 +220,11 @@ export class PlanLlama extends EventEmitter {
 
   private setupEventHandlers(): void {
     if (!this.socket) return;
-    console.log("Setting up event handlers");
+    log("Setting up event handlers");
 
     // Handle incoming work requests
     this.socket.on("work_request", (job: Job, callback) => {
-      console.log(
-        `Received work request for job '${job.name}' with ID: ${job.id}`
-      );
+      log(`Received work request for job '${job.name}' with ID: ${job.id}`);
       const handlerInfo = this.jobHandlers.get(job.name);
 
       if (!handlerInfo) {
@@ -313,7 +316,7 @@ export class PlanLlama extends EventEmitter {
       this.socket?.disconnect();
       this.isStarted = false;
       this.socket = null;
-      console.log("PlanLlama stopped");
+      log("PlanLlama stopped");
       resolve();
     });
   }
@@ -377,7 +380,7 @@ export class PlanLlama extends EventEmitter {
         "send_job",
         { name, data, options: { ...options, await: true } },
         (response: SocketResponse) => {
-          console.log("Request response:", response);
+          log("Request response:", response);
           if (response.status === "error") {
             reject(new Error(response.error));
           } else if (response.status === "ok" && response.jobId) {
@@ -674,7 +677,7 @@ export class PlanLlama extends EventEmitter {
       throw new Error("PlanLlama not started. Call start() first.");
     }
 
-    console.log(`Fetching current step results for job ID: ${jobId}`);
+    log(`Fetching current step results for job ID: ${jobId}`);
     return new Promise((resolve, reject) => {
       this.socket?.emit(
         "fetch_step_results",
@@ -701,7 +704,7 @@ export class PlanLlama extends EventEmitter {
       throw new Error("PlanLlama not started. Call start() first.");
     }
 
-    console.log(`Storing result for step '${stepName}' of job ID: ${jobId}`);
+    log(`Storing result for step '${stepName}' of job ID: ${jobId}`);
     return new Promise((resolve, reject) => {
       this.socket?.emit(
         "store_step_result",
@@ -726,7 +729,6 @@ export class PlanLlama extends EventEmitter {
    * @returns {Promise<void>} Resolves when the workflow is defined.
    * @throws {Error} If the client is not started or step definitions are invalid.
    */
-
   async workflow(name: string, steps: Steps): Promise<void> {
     if (!this.isStarted || !this.socket) {
       throw new Error("PlanLlama not started. Call start() first.");

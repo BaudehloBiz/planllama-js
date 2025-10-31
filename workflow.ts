@@ -40,8 +40,13 @@ async function main() {
     ],
   });
 
+  const startTime = process.hrtime.bigint();
   const result = await planLlama.request(jobName);
+  const endTime = process.hrtime.bigint();
+  const duration = Number(endTime - startTime) / 1e6;
+
   console.log(`Result of processing: `, result);
+  console.log(`Request took ${duration}ms (${(duration / 1000).toFixed(2)}s)`);
   process.exit(0);
 }
 
