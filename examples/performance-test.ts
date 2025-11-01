@@ -1,17 +1,13 @@
+import { randomUUID } from "node:crypto";
 import * as ProgressBar from "progress";
-import { PlanLlama } from "./src/client";
+import { PlanLlama } from "../src/client";
 
-const durationSeconds = parseInt(process.argv[2] || '10', 10);
-
-const jobName = `remote-${new Date().toLocaleDateString("en-GB", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-})}`;
-console.log(`Job name: ${jobName}`);
+const durationSeconds = parseInt(process.argv[2] || "10", 10);
 
 async function main() {
-  const planLlama = new PlanLlama(process.env.PLANLLAMA_TOKEN || "test-token");
+  const planLlama = new PlanLlama(
+    process.env.PLANLLAMA_TOKEN || "your-customer-token-here"
+  );
   let completed = 0;
   let failed = 0;
 
@@ -23,6 +19,12 @@ async function main() {
   });
 
   await planLlama.start();
+
+  const jobName = `add-${randomUUID()}`;
+  planLlama.work(jobName, async (job) => {
+    const { a, b } = job.data as { a: number; b: number };
+    return a + b;
+  });
 
   const bar = new ProgressBar("Queuing [:bar] :percent Queued: :queued", {
     total: durationSeconds,
@@ -53,10 +55,17 @@ async function main() {
   bar.tick(durationSeconds - bar.curr, {});
   console.log(`\nAll jobs queued. Waiting for completion...`);
 
+  while (completed + failed < queued) {
+    process.stdout.write(`\rCompleted: ${completed} / ${queued}`);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  const endTime = Date.now();
+  const totalElapsed = (endTime - startTime) / 1000;
   console.log(`\nPerformance test complete.`);
   console.log(
     `Jobs queued per second: ${(queued / durationSeconds).toFixed(2)}`
   );
+  console.log(`Jobs worked per second: ${(queued / totalElapsed).toFixed(2)}`);
   console.log(`Remaining jobs: ${await planLlama.getQueueSize(jobName)}`);
   await planLlama.stop();
 }

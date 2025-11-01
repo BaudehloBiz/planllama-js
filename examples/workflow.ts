@@ -1,4 +1,4 @@
-import { PlanLlama, StepResult } from "./src/client";
+import { PlanLlama, StepResult } from "../src/client";
 
 const jobName = `workflow-${new Date().toLocaleDateString("en-GB", {
   year: "numeric",
