@@ -47,7 +47,7 @@ async function main() {
 
   console.log(`Result of processing: `, result);
   console.log(`Request took ${duration}ms (${(duration / 1000).toFixed(2)}s)`);
-  process.exit(0);
+  // process.exit(0);
 }
 
 main().catch((err) => {

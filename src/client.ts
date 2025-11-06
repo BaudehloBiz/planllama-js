@@ -43,6 +43,11 @@ export interface JobOptions {
   await?: boolean;
 }
 
+export interface ScheduleOptions extends JobOptions {
+  key?: string;
+  tz?: string;
+}
+
 export interface WorkOptions {
   teamSize?: number;
   teamConcurrency?: number;
@@ -418,7 +423,7 @@ export class PlanLlama extends EventEmitter {
    * @param {string} name - The name of the job.
    * @param {string} cronPattern - The cron pattern for scheduling.
    * @param {T} data - The job data.
-   * @param {JobOptions} [options] - Optional job configuration.
+   * @param {ScheduleOptions} [options] - Optional job configuration.
    * @returns {Promise<void>} Resolves when the job is scheduled.
    * @throws {Error} If the client is not started or server returns an error.
    */
@@ -426,7 +431,7 @@ export class PlanLlama extends EventEmitter {
     name: string,
     cronPattern: string,
     data: T,
-    options?: JobOptions
+    options?: ScheduleOptions
   ): Promise<void> {
     if (!this.isStarted || !this.socket) {
       throw new Error("PlanLlama not started. Call start() first.");
