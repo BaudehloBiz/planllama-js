@@ -24,23 +24,9 @@ export interface JobOptions {
   id?: string;
   priority?: number;
   startAfter?: Date | string | number;
-  expireInSeconds?: number;
-  expireInMinutes?: number;
-  expireInHours?: number;
-  retryLimit?: number;
-  retryDelay?: number;
-  retryBackoff?: boolean;
-  retentionSeconds?: number;
-  retentionMinutes?: number;
-  retentionHours?: number;
-  retentionDays?: number;
   singletonKey?: string;
   singletonSeconds?: number;
-  singletonMinutes?: number;
-  singletonHours?: number;
   singletonNextSlot?: boolean;
-  deadLetter?: string;
-  await?: boolean;
 }
 
 export interface ScheduleOptions extends JobOptions {
@@ -49,9 +35,16 @@ export interface ScheduleOptions extends JobOptions {
 }
 
 export interface WorkOptions {
-  teamSize?: number;
-  teamConcurrency?: number;
+  expireInSeconds?: number;
+  retentionSeconds?: number;
+  deleteAfterSeconds?: number;
+  retryLimit?: number;
+  retryDelay?: number;
+  retryBackoff?: boolean;
+  retryDelayMax?: number;
 }
+
+export type PublishOptions = JobOptions & WorkOptions;
 
 export interface Job<T = unknown> {
   id: string;
@@ -264,7 +257,6 @@ export class PlanLlama extends EventEmitter {
           .then((result) => {
             if (isCancelled) return;
             clearTimeout(timeoutId);
-            // console.log(`Job '${job.name}' completed with result:`, result);
             this.socket?.emit("job_completed", {
               jobName: job.name,
               jobId: job.id,
@@ -281,6 +273,7 @@ export class PlanLlama extends EventEmitter {
               status: "error",
               error: error instanceof Error ? error.message : String(error),
             });
+
             super.emit("failed", job, error);
           });
       } catch (error) {
@@ -338,7 +331,7 @@ export class PlanLlama extends EventEmitter {
   async publish<T = unknown>(
     name: string,
     data: T,
-    options?: JobOptions
+    options?: PublishOptions
   ): Promise<string> {
     if (!this.isStarted || !this.socket) {
       throw new Error("PlanLlama not started. Call start() first.");
@@ -374,7 +367,7 @@ export class PlanLlama extends EventEmitter {
   async request<T = unknown, R = unknown>(
     name: string,
     data?: T,
-    options?: JobOptions
+    options?: PublishOptions
   ): Promise<R> {
     if (!this.isStarted || !this.socket) {
       throw new Error("PlanLlama not started. Call start() first.");
@@ -383,7 +376,7 @@ export class PlanLlama extends EventEmitter {
     return new Promise((resolve, reject) => {
       this.socket?.emit(
         "send_job",
-        { name, data, options: { ...options, await: true } },
+        { name, data, options },
         (response: SocketResponse) => {
           log("Request response:", response);
           if (response.status === "error") {
@@ -392,6 +385,7 @@ export class PlanLlama extends EventEmitter {
             // eslint-disable-next-line prefer-const
             let jobFailed: (data: any) => void;
             const jobSuccess = (data: R) => {
+              // console.log(`Job success:`, name, data);
               this.socket?.removeListener(
                 `job_failed_${response.jobId}`,
                 jobFailed
@@ -399,6 +393,7 @@ export class PlanLlama extends EventEmitter {
               resolve(data);
             };
             jobFailed = (data: any) => {
+              // console.log(`Job failed:`, name, data);
               this.socket?.removeListener(
                 `job_completed_${response.jobId}`,
                 jobSuccess
@@ -756,7 +751,7 @@ export class PlanLlama extends EventEmitter {
     }
 
     // Now setup the workflow runner
-    this.work(name, async (job) => {
+    this.work(name, { retryLimit: 0 }, async (job) => {
       // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
       const numTasks = Object.keys(steps).length;
@@ -767,7 +762,12 @@ export class PlanLlama extends EventEmitter {
 
       cycleCheck();
       getNextSteps(steps);
-      return runSteps();
+      console.log(
+        `Starting workflow '${name}' with ${numTasks} steps. Next: [${nextSteps.join(
+          ", "
+        )}], Pending: [${Object.keys(pendingSteps).join(", ")}]`
+      );
+      await runSteps();
 
       function getNextSteps(_steps: Steps) {
         nextSteps = [];
@@ -775,7 +775,6 @@ export class PlanLlama extends EventEmitter {
 
         for (const [stepName, step] of Object.entries(_steps)) {
           if (stepResults.has(stepName)) {
-            // console.log(`Step '${stepName}' already completed, skipping`);
             continue;
           }
           // Sort into nextSteps based on dependencies
@@ -868,7 +867,7 @@ export class PlanLlama extends EventEmitter {
         await Promise.all(stepPromises);
 
         getNextSteps(pendingSteps);
-        return runSteps();
+        return await runSteps();
       }
 
       async function runStep(stepName: string) {

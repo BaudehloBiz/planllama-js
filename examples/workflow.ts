@@ -1,6 +1,6 @@
 import { PlanLlama, StepResult } from "../src/client";
 
-const jobName = `workflow-${new Date().toLocaleDateString("en-GB", {
+const jobName = `workflow3-${new Date().toLocaleDateString("en-GB", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
@@ -35,6 +35,7 @@ async function main() {
       "step3",
       async (results: StepResult) => {
         console.log("Step 4 processing:", results);
+        throw "Error in step 4";
         return "step4";
       },
     ],
