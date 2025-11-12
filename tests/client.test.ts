@@ -402,9 +402,10 @@ describe("PlanLlama Work Registration", () => {
 
 		expect(handler).toHaveBeenCalledWith(mockJob);
 		expect(mockCallback).toHaveBeenCalledWith({
-			status: "error",
-			error: "Processing failed",
-		});
+      status: "error",
+      error: "Processing failed",
+      stack: expect.any(String),
+    });
 		expect(failedHandler).toHaveBeenCalledWith(mockJob, expect.any(Error));
 	});
 
