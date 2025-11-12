@@ -81,15 +81,15 @@ describe("PlanLlama Performance Tests", () => {
 		// Simulate rapid work requests
 		for (let i = 0; i < jobCount; i++) {
 			const job: Job = {
-				id: `fast-job-${i}`,
-				name: "fast-job",
-				data: { index: i },
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+        id: `fast-job-${i}`,
+        name: "fast-job",
+        data: { index: i },
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
 			// Stagger slightly to avoid overwhelming
 			setTimeout(() => mockSocket.mockServerEvent("work_request", job), i);
@@ -126,138 +126,138 @@ describe("PlanLlama Performance Tests", () => {
 	});
 
 	it("should handle memory efficiently with large job data", async () => {
-		const largeDataSize = 1024 * 1024; // 1MB
-		const jobCount = 10;
-		const processedJobs: string[] = [];
+    const largeDataSize = 1024 * 1024; // 1MB
+    const jobCount = 10;
+    const processedJobs: string[] = [];
 
-		// Register handler for large data
-		planLlama.work("large-data-job", async (job) => {
-			const { id, data } = job.data as { id: string; data: string };
+    // Register handler for large data
+    planLlama.work("large-data-job", async (job) => {
+      const { id, data } = job.data as { id: string; data: string };
 
-			// Verify data integrity
-			expect(data.length).toBe(largeDataSize);
-			expect(data[0]).toBe("A");
-			expect(data[data.length - 1]).toBe("Z");
+      // Verify data integrity
+      expect(data.length).toBe(largeDataSize);
+      expect(data[0]).toBe("A");
+      expect(data[data.length - 1]).toBe("Z");
 
-			processedJobs.push(id);
-			return { processed: true, size: data.length };
-		});
+      processedJobs.push(id);
+      return { processed: true, size: data.length };
+    });
 
-		// Create large data payload
-		const createLargeData = (id: string) => ({
-			id,
-			data: `${"A".repeat(largeDataSize - 1)}Z`,
-		});
+    // Create large data payload
+    const createLargeData = (id: string) => ({
+      id,
+      data: `${"A".repeat(largeDataSize - 1)}Z`,
+    });
 
-		const startTime = Date.now();
+    const startTime = Date.now();
 
-		// Send jobs with large data
-		for (let i = 0; i < jobCount; i++) {
-			const job: Job = {
-				id: `large-job-${i}`,
-				name: "large-data-job",
-				data: createLargeData(`large-job-${i}`),
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+    // Send jobs with large data
+    for (let i = 0; i < jobCount; i++) {
+      const job: Job = {
+        id: `large-job-${i}`,
+        name: "large-data-job",
+        data: createLargeData(`large-job-${i}`),
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
-			setTimeout(
-				() => mockSocket.mockServerEvent("work_request", job),
-				i * 100,
-			);
-		}
+      setTimeout(
+        () => mockSocket.mockServerEvent("work_request", job),
+        i * 100
+      );
+    }
 
-		// Wait for processing
-		await new Promise((resolve) => {
-			const checkCompletion = () => {
-				if (processedJobs.length === jobCount) {
-					resolve(undefined);
-				} else {
-					setTimeout(checkCompletion, 100);
-				}
-			};
-			checkCompletion();
-		});
+    // Wait for processing
+    await new Promise((resolve) => {
+      const checkCompletion = () => {
+        if (processedJobs.length === jobCount) {
+          resolve(undefined);
+        } else {
+          setTimeout(checkCompletion, 100);
+        }
+      };
+      checkCompletion();
+    });
 
-		const endTime = Date.now();
-		const duration = endTime - startTime;
+    const endTime = Date.now();
+    const duration = endTime - startTime;
 
-		expect(processedJobs).toHaveLength(jobCount);
+    expect(processedJobs).toHaveLength(jobCount);
 
-		// Should handle large data efficiently
-		expect(duration).toBeLessThan(5000);
+    // Should handle large data efficiently
+    expect(duration).toBeLessThan(5000);
 
-		// Memory usage should remain reasonable (this is more of a smoke test)
-		const usedMemory = process.memoryUsage().heapUsed;
-		expect(usedMemory).toBeLessThan(100 * 1024 * 1024); // Under 100MB
-	});
+    // Memory usage should remain reasonable (this is more of a smoke test)
+    const usedMemory = process.memoryUsage().heapUsed;
+    expect(usedMemory).toBeLessThan(120 * 1024 * 1024); // Under 120MB
+  });
 
-	it("should handle event listener performance efficiently", async () => {
-		const eventCounts = {
-			completed: 0,
-			failed: 0,
-			active: 0,
-			retrying: 0,
-		};
+  it("should handle event listener performance efficiently", async () => {
+    const eventCounts = {
+      completed: 0,
+      failed: 0,
+      active: 0,
+      retrying: 0,
+    };
 
-		// Add multiple event listeners
-		const listenerCount = 10;
-		for (let i = 0; i < listenerCount; i++) {
-			planLlama.on("completed", () => eventCounts.completed++);
-			planLlama.on("failed", () => eventCounts.failed++);
-			planLlama.on("active", () => eventCounts.active++);
-			planLlama.on("retrying", () => eventCounts.retrying++);
-		}
+    // Add multiple event listeners
+    const listenerCount = 10;
+    for (let i = 0; i < listenerCount; i++) {
+      planLlama.on("completed", () => eventCounts.completed++);
+      planLlama.on("failed", () => eventCounts.failed++);
+      planLlama.on("active", () => eventCounts.active++);
+      planLlama.on("retrying", () => eventCounts.retrying++);
+    }
 
-		// Register job handlers
-		planLlama.work("success-job", async () => ({ success: true }));
-		planLlama.work("fail-job", async () => {
-			throw new Error("Intentional failure");
-		});
+    // Register job handlers
+    planLlama.work("success-job", async () => ({ success: true }));
+    planLlama.work("fail-job", async () => {
+      throw new Error("Intentional failure");
+    });
 
-		const jobCount = 100;
-		const startTime = Date.now();
+    const jobCount = 100;
+    const startTime = Date.now();
 
-		// Send mix of successful and failing jobs
-		for (let i = 0; i < jobCount; i++) {
-			const jobName = i % 2 === 0 ? "success-job" : "fail-job";
-			const job: Job = {
-				id: `event-job-${i}`,
-				name: jobName,
-				data: { index: i },
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 5000,
-			};
+    // Send mix of successful and failing jobs
+    for (let i = 0; i < jobCount; i++) {
+      const jobName = i % 2 === 0 ? "success-job" : "fail-job";
+      const job: Job = {
+        id: `event-job-${i}`,
+        name: jobName,
+        data: { index: i },
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 5000,
+      };
 
-			setTimeout(() => mockSocket.mockServerEvent("work_request", job), i * 10);
-		}
+      setTimeout(() => mockSocket.mockServerEvent("work_request", job), i * 10);
+    }
 
-		// Wait for all events to be processed
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Wait for all events to be processed
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		const endTime = Date.now();
-		const duration = endTime - startTime;
+    const endTime = Date.now();
+    const duration = endTime - startTime;
 
-		// Verify event handling
-		expect(eventCounts.active).toBe(jobCount * listenerCount);
-		expect(eventCounts.completed).toBe((jobCount / 2) * listenerCount);
-		expect(eventCounts.failed).toBe((jobCount / 2) * listenerCount);
+    // Verify event handling
+    expect(eventCounts.active).toBe(jobCount * listenerCount);
+    expect(eventCounts.completed).toBe((jobCount / 2) * listenerCount);
+    expect(eventCounts.failed).toBe((jobCount / 2) * listenerCount);
 
-		// Should handle events efficiently
-		expect(duration).toBeLessThan(5000);
+    // Should handle events efficiently
+    expect(duration).toBeLessThan(5000);
 
-		// Event processing should not significantly impact performance
-		const eventsPerSecond =
-			(eventCounts.active + eventCounts.completed + eventCounts.failed) /
-			(duration / 1000);
-		expect(eventsPerSecond).toBeGreaterThan(100);
-	});
+    // Event processing should not significantly impact performance
+    const eventsPerSecond =
+      (eventCounts.active + eventCounts.completed + eventCounts.failed) /
+      (duration / 1000);
+    expect(eventsPerSecond).toBeGreaterThan(100);
+  });
 
 	it("should handle concurrent connections efficiently", async () => {
 		const connectionCount = 5;

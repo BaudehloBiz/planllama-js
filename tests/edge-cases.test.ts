@@ -103,266 +103,265 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
 	});
 
 	describe("Job Sending Edge Cases", () => {
-		beforeEach(async () => {
-			planLlama = new PlanLlama({
-				apiToken: "test-token",
-				serverUrl: "http://localhost:3000",
-			});
-			const connectPromise = planLlama.start();
-			await mockSocket.mockConnect();
-			await connectPromise;
-		});
+    beforeEach(async () => {
+      planLlama = new PlanLlama({
+        apiToken: "test-token",
+        serverUrl: "http://localhost:3000",
+      });
+      const connectPromise = planLlama.start();
+      await mockSocket.mockConnect();
+      await connectPromise;
+    });
 
-		it("should handle server timeout on job sending", async () => {
-			// Mock server that never responds
-			mockSocket.emit.mockImplementation(() => {
-				// No callback called
-			});
+    it("should handle server timeout on job sending", async () => {
+      // Mock server that never responds
+      mockSocket.emit.mockImplementation(() => {
+        // No callback called
+      });
 
-			const _sendPromise = planLlama.publish("timeout-job", {});
+      planLlama.publish("timeout-job", {});
 
-			// This will hang indefinitely in real scenario
-			// In test, we'll just verify the call was made
-			expect(mockSocket.emit).toHaveBeenCalledWith(
-				"send_job",
-				expect.objectContaining({ name: "timeout-job" }),
-				expect.any(Function),
-			);
-		});
+      // This will hang indefinitely in real scenario
+      // In test, we'll just verify the call was made
+      expect(mockSocket.emit).toHaveBeenCalledWith(
+        "send_job",
+        expect.objectContaining({ name: "timeout-job" }),
+        expect.any(Function)
+      );
+    });
 
-		it("should handle malformed server responses", async () => {
-			mockSocket.emit.mockImplementation((event, _data, callback) => {
-				if (event === "send_job" && callback) {
-					// Malformed response
-					callback({ invalidField: "bad-response" });
-				}
-			});
+    it("should handle malformed server responses", async () => {
+      mockSocket.emit.mockImplementation((event, _data, callback) => {
+        if (event === "send_job" && callback) {
+          // Malformed response
+          callback({ invalidField: "bad-response" });
+        }
+      });
 
-			await expect(planLlama.publish("test-job", {})).rejects.toThrow(
-				"Invalid response from server",
-			);
-		});
+      await expect(planLlama.publish("test-job", {})).rejects.toThrow(
+        "Invalid response from server"
+      );
+    });
 
-		it("should handle null/undefined job data", async () => {
-			mockSocket.emit.mockImplementation((event, _data, callback) => {
-				if (event === "send_job" && callback) {
-					callback({ status: "ok", jobId: "null-data-job" });
-				}
-			});
+    it("should handle null/undefined job data", async () => {
+      mockSocket.emit.mockImplementation((event, _data, callback) => {
+        if (event === "send_job" && callback) {
+          callback({ status: "ok", jobId: "null-data-job" });
+        }
+      });
 
-			// Should handle null data
-			await expect(planLlama.publish("test-job", null)).resolves.toBe(
-				"null-data-job",
-			);
+      // Should handle null data
+      await expect(planLlama.publish("test-job", null)).resolves.toBe(
+        "null-data-job"
+      );
 
-			// Should handle undefined data
-			await expect(planLlama.publish("test-job", undefined)).resolves.toBe(
-				"null-data-job",
-			);
-		});
+      // Should handle undefined data
+      await expect(planLlama.publish("test-job", undefined)).resolves.toBe(
+        "null-data-job"
+      );
+    });
 
-		it("should handle extremely large job payloads", async () => {
-			const largePayload = {
-				data: "x".repeat(10 * 1024 * 1024), // 10MB string
-				metadata: Array.from({ length: 1000 }, (_, i) => ({
-					id: i,
-					value: `item-${i}`,
-				})),
-			};
+    it("should handle extremely large job payloads", async () => {
+      const largePayload = {
+        data: "x".repeat(10 * 1024 * 1024), // 10MB string
+        metadata: Array.from({ length: 1000 }, (_, i) => ({
+          id: i,
+          value: `item-${i}`,
+        })),
+      };
 
-			mockSocket.emit.mockImplementation((event, _data, callback) => {
-				if (event === "send_job" && callback) {
-					callback({ status: "ok", jobId: "large-payload-job" });
-				}
-			});
+      mockSocket.emit.mockImplementation((event, _data, callback) => {
+        if (event === "send_job" && callback) {
+          callback({ status: "ok", jobId: "large-payload-job" });
+        }
+      });
 
-			await expect(planLlama.publish("large-job", largePayload)).resolves.toBe(
-				"large-payload-job",
-			);
-		});
+      await expect(planLlama.publish("large-job", largePayload)).resolves.toBe(
+        "large-payload-job"
+      );
+    });
 
-		it("should handle circular references in job data", async () => {
-			const circularData: Record<string, unknown> = { name: "test" };
-			circularData.self = circularData;
+    it("should handle circular references in job data", async () => {
+      const circularData: Record<string, unknown> = { name: "test" };
+      circularData.self = circularData;
 
-			mockSocket.emit.mockImplementation((event, _data, callback) => {
-				if (event === "send_job" && callback) {
-					callback({ status: "ok", jobId: "circular-job" });
-				}
-			});
+      mockSocket.emit.mockImplementation((event, _data, callback) => {
+        if (event === "send_job" && callback) {
+          callback({ status: "ok", jobId: "circular-job" });
+        }
+      });
 
-			// Should not throw when sending circular data (JSON.stringify might fail, but that's server-side)
-			await expect(
-				planLlama.publish("circular-job", circularData),
-			).resolves.toBe("circular-job");
-		});
-	});
+      // Should not throw when sending circular data (JSON.stringify might fail, but that's server-side)
+      await expect(
+        planLlama.publish("circular-job", circularData)
+      ).resolves.toBe("circular-job");
+    });
+  });
 
-	describe("Job Processing Edge Cases", () => {
-		beforeEach(async () => {
-			planLlama = new PlanLlama({
-				apiToken: "test-token",
-				serverUrl: "http://localhost:3000",
-			});
-			const connectPromise = planLlama.start();
-			await mockSocket.mockConnect();
-			await connectPromise;
-		});
+  describe("Job Processing Edge Cases", () => {
+    beforeEach(async () => {
+      planLlama = new PlanLlama({
+        apiToken: "test-token",
+        serverUrl: "http://localhost:3000",
+      });
+      const connectPromise = planLlama.start();
+      await mockSocket.mockConnect();
+      await connectPromise;
+    });
 
-		it("should handle job handler throwing non-Error objects", async () => {
-			planLlama.work("weird-error-job", async () => {
-				// eslint-disable-next-line @typescript-eslint/no-throw-literal
-				throw "string error";
-			});
+    it("should handle job handler throwing non-Error objects", async () => {
+      planLlama.work("weird-error-job", async () => {
+        throw "string error";
+      });
 
-			const mockJob: Job = {
-				id: "weird-error-123",
-				name: "weird-error-job",
-				data: {},
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+      const mockJob: Job = {
+        id: "weird-error-123",
+        name: "weird-error-job",
+        data: {},
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
-			const mockCallback = jest.fn();
+      const mockCallback = jest.fn();
 
-			mockSocket.mockServerEvent("work_request", mockJob, mockCallback);
+      mockSocket.mockServerEvent("work_request", mockJob, mockCallback);
 
-			await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
-			expect(mockCallback).toHaveBeenCalledWith({
-				status: "error",
-				error: "string error",
-			});
-		});
+      expect(mockCallback).toHaveBeenCalledWith({
+        status: "error",
+        error: "string error",
+      });
+    });
 
-		it("should handle job handler returning undefined", async () => {
-			planLlama.work("undefined-result-job", async () => {
-				return undefined;
-			});
+    it("should handle job handler returning undefined", async () => {
+      planLlama.work("undefined-result-job", async () => {
+        return undefined;
+      });
 
-			const mockJob: Job = {
-				id: "undefined-result-123",
-				name: "undefined-result-job",
-				data: {},
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+      const mockJob: Job = {
+        id: "undefined-result-123",
+        name: "undefined-result-job",
+        data: {},
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
-			mockSocket.mockServerEvent("work_request", mockJob, () => {});
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
-			await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
-			expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
-				jobId: "undefined-result-123",
-				jobName: "undefined-result-job",
-				result: undefined,
-			});
-		});
+      expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
+        jobId: "undefined-result-123",
+        jobName: "undefined-result-job",
+        result: undefined,
+      });
+    });
 
-		it("should handle job handler that never resolves", async () => {
-			planLlama.work("hanging-job", async () => {
-				// Simulate hanging promise
-				return new Promise(() => {
-					// Never resolves
-				});
-			});
+    it("should handle job handler that never resolves", async () => {
+      planLlama.work("hanging-job", async () => {
+        // Simulate hanging promise
+        return new Promise(() => {
+          // Never resolves
+        });
+      });
 
-			const mockJob: Job = {
-				id: "hanging-123",
-				name: "hanging-job",
-				data: {},
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+      const mockJob: Job = {
+        id: "hanging-123",
+        name: "hanging-job",
+        data: {},
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
-			mockSocket.mockServerEvent("work_request", mockJob, () => {});
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
-			// Wait a reasonable time
-			await new Promise((resolve) => setImmediate(resolve));
+      // Wait a reasonable time
+      await new Promise((resolve) => setImmediate(resolve));
 
-			// Should have sent job_started but not job_completed or job_failed
-			expect(mockSocket.emit).toHaveBeenCalledWith("job_started", {
-				jobId: "hanging-123",
-				jobName: "hanging-job",
-			});
-			expect(mockSocket.emit).not.toHaveBeenCalledWith(
-				"job_completed",
-				expect.any(Object),
-			);
-			expect(mockSocket.emit).not.toHaveBeenCalledWith(
-				"job_failed",
-				expect.any(Object),
-			);
-		});
+      // Should have sent job_started but not job_completed or job_failed
+      expect(mockSocket.emit).toHaveBeenCalledWith("job_started", {
+        jobId: "hanging-123",
+        jobName: "hanging-job",
+      });
+      expect(mockSocket.emit).not.toHaveBeenCalledWith(
+        "job_completed",
+        expect.any(Object)
+      );
+      expect(mockSocket.emit).not.toHaveBeenCalledWith(
+        "job_failed",
+        expect.any(Object)
+      );
+    });
 
-		it("should handle malformed job data from server", async () => {
-			planLlama.work("normal-job", async (job) => {
-				return { processed: job.id };
-			});
+    it("should handle malformed job data from server", async () => {
+      planLlama.work("normal-job", async (job) => {
+        return { processed: job.id };
+      });
 
-			// Send malformed job without required fields
-			const malformedJob = {
-				// Missing required fields like 'id', 'name', etc.
-				data: { test: "data" },
-			} as unknown as Job;
+      // Send malformed job without required fields
+      const malformedJob = {
+        // Missing required fields like 'id', 'name', etc.
+        data: { test: "data" },
+      } as unknown as Job;
 
-			mockSocket.mockServerEvent("work_request", malformedJob, () => {});
+      mockSocket.mockServerEvent("work_request", malformedJob, () => {});
 
-			await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
-			// Should handle gracefully (might fail due to missing fields)
-			// The exact behavior depends on how the handler accesses job properties
-		});
+      // Should handle gracefully (might fail due to missing fields)
+      // The exact behavior depends on how the handler accesses job properties
+    });
 
-		it("should handle job with extremely deep nested data", async () => {
-			planLlama.work("deep-nested-job", async (job) => {
-				// Just process the job without accessing deep nested data to avoid errors
-				return { processed: true, jobId: job.id };
-			});
+    it("should handle job with extremely deep nested data", async () => {
+      planLlama.work("deep-nested-job", async (job) => {
+        // Just process the job without accessing deep nested data to avoid errors
+        return { processed: true, jobId: job.id };
+      });
 
-			// Create deeply nested data structure
-			let deepData: Record<string, unknown> = { value: "deep-value" };
-			for (let i = 0; i < 50; i++) {
-				// Reduced depth to avoid potential issues
-				deepData = { [`level${i}`]: deepData };
-			}
+      // Create deeply nested data structure
+      let deepData: Record<string, unknown> = { value: "deep-value" };
+      for (let i = 0; i < 50; i++) {
+        // Reduced depth to avoid potential issues
+        deepData = { [`level${i}`]: deepData };
+      }
 
-			const mockJob: Job = {
-				id: "deep-nested-123",
-				name: "deep-nested-job",
-				data: deepData,
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+      const mockJob: Job = {
+        id: "deep-nested-123",
+        name: "deep-nested-job",
+        data: deepData,
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
-			mockSocket.mockServerEvent("work_request", mockJob, () => {});
+      mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
-			await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
-			// Should handle without stack overflow
-			expect(mockSocket.emit).toHaveBeenCalledWith("job_started", {
-				jobName: "deep-nested-job",
-				jobId: "deep-nested-123",
-			});
-			expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
-				jobId: "deep-nested-123",
-				jobName: "deep-nested-job",
-				result: { processed: true, jobId: "deep-nested-123" },
-			});
-		});
-	});
+      // Should handle without stack overflow
+      expect(mockSocket.emit).toHaveBeenCalledWith("job_started", {
+        jobName: "deep-nested-job",
+        jobId: "deep-nested-123",
+      });
+      expect(mockSocket.emit).toHaveBeenCalledWith("job_completed", {
+        jobId: "deep-nested-123",
+        jobName: "deep-nested-job",
+        result: { processed: true, jobId: "deep-nested-123" },
+      });
+    });
+  });
 
 	describe("Event System Edge Cases", () => {
 		beforeEach(async () => {
@@ -385,15 +384,15 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
 			planLlama.work("test-job", async () => ({ success: true }));
 
 			const mockJob: Job = {
-				id: "event-error-123",
-				name: "test-job",
-				data: {},
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+        id: "event-error-123",
+        name: "test-job",
+        data: {},
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
 			mockSocket.mockServerEvent("work_request", mockJob, () => {});
 
@@ -424,15 +423,15 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
 			// Trigger multiple events
 			for (let i = 0; i < 3; i++) {
 				const mockJob: Job = {
-					id: `remove-listener-${i}`,
-					name: "test-job",
-					data: {},
-					state: "active",
-					retryCount: 0,
-					priority: 0,
-					createdAt: new Date(),
-					timeout: 1,
-				};
+          id: `remove-listener-${i}`,
+          name: "test-job",
+          data: {},
+          state: "active",
+          retryCount: 0,
+          priority: 0,
+          createdAt: new Date(),
+          expireInSeconds: 1,
+        };
 
 				mockSocket.mockServerEvent("work_request", mockJob, () => {});
 				await new Promise((resolve) => setImmediate(resolve));
@@ -487,15 +486,15 @@ describe("PlanLlama Error Handling and Edge Cases", () => {
 			});
 
 			const mockJob: Job = {
-				id: "long-running-123",
-				name: "long-running-job",
-				data: {},
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+        id: "long-running-123",
+        name: "long-running-job",
+        data: {},
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 
 			// Start job processing by emitting the work_request event
 			mockSocket.mockServerEvent("work_request", mockJob, () => {});

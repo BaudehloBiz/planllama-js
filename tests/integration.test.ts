@@ -71,19 +71,19 @@ describe("PlanLlama Integration Tests", () => {
 
 		// Simulate server sending work request
 		const emailJob: Job = {
-			id: "email-job-123",
-			name: "send-email",
-			data: {
-				to: "user@example.com",
-				subject: "Welcome!",
-				body: "Thanks for signing up!",
-			},
-			state: "active",
-			retryCount: 0,
-			priority: 0,
-			createdAt: new Date(),
-			timeout: 1,
-		};
+      id: "email-job-123",
+      name: "send-email",
+      data: {
+        to: "user@example.com",
+        subject: "Welcome!",
+        body: "Thanks for signing up!",
+      },
+      state: "active",
+      retryCount: 0,
+      priority: 0,
+      createdAt: new Date(),
+      expireInSeconds: 1,
+    };
 
 		mockSocket.mockServerEvent("work_request", emailJob);
 
@@ -148,15 +148,15 @@ describe("PlanLlama Integration Tests", () => {
 
 		// Simulate multiple work requests (original + retries)
 		const createJobAttempt = (retryCount: number): Job => ({
-			id: "flaky-job-456",
-			name: "flaky-job",
-			data: { data: "test" },
-			state: retryCount > 0 ? "retry" : "active",
-			retryCount,
-			priority: 0,
-			createdAt: new Date(),
-			timeout: 1,
-		});
+      id: "flaky-job-456",
+      name: "flaky-job",
+      data: { data: "test" },
+      state: retryCount > 0 ? "retry" : "active",
+      retryCount,
+      priority: 0,
+      createdAt: new Date(),
+      expireInSeconds: 1,
+    });
 
 		// First attempt (fails)
 		mockSocket.mockServerEvent("work_request", createJobAttempt(0));
@@ -219,15 +219,15 @@ describe("PlanLlama Integration Tests", () => {
 		for (let index = 0; index < batchJobs.length; index++) {
 			const batchJob = batchJobs[index];
 			const job: Job = {
-				id: `batch-job-${index + 1}`,
-				name: batchJob.name,
-				data: batchJob.data,
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+        id: `batch-job-${index + 1}`,
+        name: batchJob.name,
+        data: batchJob.data,
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 			mockSocket.mockServerEvent("work_request", job);
 			// Small delay between jobs to allow processing
 			await new Promise((resolve) => setImmediate(resolve));
@@ -252,22 +252,21 @@ describe("PlanLlama Integration Tests", () => {
 
 		// Register handler with concurrency options
 		planLlama.work(
-			"concurrent-job",
-			{
-				teamSize: 3,
-				teamConcurrency: 2,
-			},
-			async (job) => {
-				const jobId = job.id;
-				startTimes[jobId] = Date.now();
+      "concurrent-job",
+      {
+        expireInSeconds: 5,
+      },
+      async (job) => {
+        const jobId = job.id;
+        startTimes[jobId] = Date.now();
 
-				// Simulate work that takes some time
-				await new Promise((resolve) => setTimeout(resolve, 20));
+        // Simulate work that takes some time
+        await new Promise((resolve) => setTimeout(resolve, 20));
 
-				endTimes[jobId] = Date.now();
-				return { jobId, processed: true };
-			},
-		);
+        endTimes[jobId] = Date.now();
+        return { jobId, processed: true };
+      }
+    );
 
 		// Give worker registration time to complete
 		await new Promise((resolve) => setImmediate(resolve));
@@ -283,15 +282,15 @@ describe("PlanLlama Integration Tests", () => {
 		// Send all jobs immediately to test concurrency
 		for (const jobId of jobIds) {
 			const job: Job = {
-				id: jobId,
-				name: "concurrent-job",
-				data: { index: jobIds.indexOf(jobId) },
-				state: "active",
-				retryCount: 0,
-				priority: 0,
-				createdAt: new Date(),
-				timeout: 1,
-			};
+        id: jobId,
+        name: "concurrent-job",
+        data: { index: jobIds.indexOf(jobId) },
+        state: "active",
+        retryCount: 0,
+        priority: 0,
+        createdAt: new Date(),
+        expireInSeconds: 1,
+      };
 			mockSocket.mockServerEvent("work_request", job);
 		}
 

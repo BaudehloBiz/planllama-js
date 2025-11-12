@@ -65,7 +65,6 @@ export interface Job<T = unknown> {
   completedAt?: Date;
   failedAt?: Date;
   expireInSeconds: number;
-  timeout: number;
 }
 
 export interface BatchJob<T = unknown> {
