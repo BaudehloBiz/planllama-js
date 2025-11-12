@@ -272,6 +272,7 @@ export class PlanLlama extends EventEmitter {
             callback?.({
               status: "error",
               error: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
             });
 
             super.emit("failed", job, error);

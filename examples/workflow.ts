@@ -35,7 +35,7 @@ async function main() {
       "step3",
       async (results: StepResult) => {
         console.log("Step 4 processing:", results);
-        throw "Error in step 4";
+        // throw "Error in step 4";
         return "step4";
       },
     ],
