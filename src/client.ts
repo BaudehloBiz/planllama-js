@@ -3,11 +3,38 @@ import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import { debuglog, DebugLogger } from "node:util";
 
-let log = debuglog("planllama", (debug) => {
-  log = debug as DebugLogger;
-});
+// Browser-compatible logging
+// Use `as any` to safely check for browser environment
+const isBrowser = typeof (globalThis as any).window !== "undefined" && typeof (globalThis as any).window.document !== "undefined";
+
+type DebugLogger = (msg: string, ...args: any[]) => void;
+
+let log: DebugLogger;
+if (isBrowser) {
+  // Browser: use console.debug with prefix
+  log = (msg: string, ...args: any[]) => {
+    // In browser, check if DEBUG flag is set (e.g., via localStorage or global var)
+    const debugEnabled = typeof (globalThis as any).localStorage !== "undefined" 
+      ? (globalThis as any).localStorage.getItem("DEBUG")?.includes("planllama")
+      : false;
+    if (debugEnabled) {
+      console.debug(`[planllama] ${msg}`, ...args);
+    }
+  };
+} else {
+  // Node.js: use debuglog
+  // Dynamic import to avoid bundler issues
+  let debuglogFn: any;
+  try {
+    debuglogFn = eval('require("node:util")').debuglog;
+  } catch {
+    debuglogFn = () => () => {}; // noop fallback
+  }
+  log = debuglogFn("planllama", (debug: DebugLogger) => {
+    log = debug;
+  });
+}
 
 export interface PlanLlamaOptions {
   apiToken: string;
