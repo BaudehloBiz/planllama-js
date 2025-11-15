@@ -1,6 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { EventEmitter } from "node:events";
-import { readFile } from "node:fs/promises";
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 
@@ -39,6 +37,82 @@ if (isBrowser) {
   log = debuglogFn("planllama", (debug: DebugLogger) => {
     log = debug;
   });
+}
+
+// Browser-compatible EventEmitter
+let EventEmitter: any;
+if (isBrowser) {
+  // Simple EventEmitter implementation for browsers
+  type EventListener = (...args: any[]) => void;
+
+  EventEmitter = class {
+    private events: Record<string, EventListener[]> = {};
+
+    on(event: string, listener: EventListener) {
+      if (!this.events[event]) {
+        this.events[event] = [];
+      }
+      this.events[event].push(listener);
+      return this;
+    }
+
+    once(event: string, listener: EventListener) {
+      const onceWrapper = (...args: any[]) => {
+        this.removeListener(event, onceWrapper);
+        listener.apply(this, args);
+      };
+      return this.on(event, onceWrapper);
+    }
+
+    emit(event: string, ...args: any[]) {
+      const listeners = this.events[event];
+      if (listeners) {
+        listeners.forEach((listener) => listener.apply(this, args));
+      }
+      return listeners && listeners.length > 0;
+    }
+
+    removeListener(event: string, listener: EventListener) {
+      const listeners = this.events[event];
+      if (listeners) {
+        const index = listeners.indexOf(listener);
+        if (index !== -1) {
+          listeners.splice(index, 1);
+        }
+      }
+      return this;
+    }
+
+    removeAllListeners(event?: string) {
+      if (event) {
+        delete this.events[event];
+      } else {
+        this.events = {};
+      }
+      return this;
+    }
+  };
+} else {
+  EventEmitter = eval('require("node:events")').EventEmitter;
+}
+
+// Browser-compatible readFile
+let readFile: any;
+if (isBrowser) {
+  // In browser, fetch package.json from bundled metadata or use placeholder
+  readFile = async (path: string) => {
+    if (path === "package.json") {
+      // Return placeholder version info for browsers
+      return JSON.stringify({
+        version: "1.0.0",
+        name: "plan-llama",
+        description: "PlanLlama Client",
+      });
+    }
+    throw new Error(`File reading not supported in browser: ${path}`);
+  };
+} else {
+  readFile = eval('require("node:fs/promises")').readFile;
 }
 
 export interface PlanLlamaOptions {
