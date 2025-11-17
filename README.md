@@ -5,13 +5,13 @@ A simple and powerful job scheduler for Node.js applications. PlanLlama provides
 ## Installation
 
 ```bash
-npm install planLlama
+npm install planllama
 ```
 
 ## Quick Start
 
 ```typescript
-import { PlanLlama } from "planLlama";
+import { PlanLlama } from "planllama";
 
 // Initialize with your api token
 const planLlama = new PlanLlama("your-api-token");
@@ -19,11 +19,17 @@ const planLlama = new PlanLlama("your-api-token");
 // Start the job scheduler
 await planLlama.start();
 
-// Schedule a job
-await planLlama.send("send-email", {
+// Publish a job (fire-and-forget)
+await planLlama.publish("send-email", {
   to: "user@example.com",
   subject: "Welcome!",
   body: "Thanks for signing up!",
+});
+
+// Or request a job and wait for the result
+const result = await planLlama.request("generate-report", {
+  userId: 123,
+  reportType: "monthly",
 });
 ```
 
@@ -32,7 +38,7 @@ await planLlama.send("send-email", {
 ### Basic Setup
 
 ```typescript
-import { PlanLlama } from "planLlama";
+import { PlanLlama } from "planllama";
 
 // Option 1: Initialize with token string
 const planLlama = new PlanLlama("your-api-token");
@@ -44,13 +50,13 @@ const planLlama = new PlanLlama({
 });
 ```
 
-## Scheduling Jobs
+## Publishing Jobs
 
-### Immediate Jobs
+### Immediate Jobs (Fire-and-Forget)
 
 ```typescript
-// Send a job to be processed immediately
-await planLlama.send("process-payment", {
+// Publish a job to be processed immediately
+await planLlama.publish("process-payment", {
   userId: 123,
   amount: 29.99,
   currency: "USD",
@@ -60,15 +66,15 @@ await planLlama.send("process-payment", {
 ### Delayed Jobs
 
 ```typescript
-// Schedule a job to run in 5 minutes
-await planLlama.send(
+// Publish a job to run in 5 minutes
+await planLlama.publish(
   "reminder-email",
   { userId: 123, message: "Don't forget!" },
   { startAfter: new Date(Date.now() + 5 * 60 * 1000) }
 );
 
-// Schedule a job to run in 1 hour
-await planLlama.send(
+// Publish a job to run in 1 hour
+await planLlama.publish(
   "cleanup-temp-files",
   { directory: "/tmp/uploads" },
   { startAfter: "1 hour" }
@@ -93,6 +99,28 @@ await planLlama.schedule("daily-report", "0 2 * * *", {
 await planLlama.schedule("weekly-summary", "0 9 * * 1", {
   type: "weekly",
 });
+```
+
+### Request Pattern (Wait for Result)
+
+```typescript
+// Request a job and wait for the result
+const report = await planLlama.request("generate-report", {
+  userId: 123,
+  year: 2025,
+});
+console.log("Report generated:", report);
+
+// Request with timeout
+try {
+  const result = await planLlama.request(
+    "slow-operation",
+    { data: "important" },
+    { timeout: 30000 } // 30 seconds
+  );
+} catch (error) {
+  console.error("Request timed out or failed:", error);
+}
 ```
 
 ## Job Handlers
@@ -139,7 +167,7 @@ planLlama.work(
 ### Retry Configuration
 
 ```typescript
-await planLlama.send(
+await planLlama.publish(
   "flaky-api-call",
   { url: "https://api.unreliable.com/data" },
   {
@@ -153,7 +181,7 @@ await planLlama.send(
 ### Job Expiration
 
 ```typescript
-await planLlama.send(
+await planLlama.publish(
   "time-sensitive-task",
   { data: "important" },
   {
@@ -166,14 +194,14 @@ await planLlama.send(
 
 ```typescript
 // High priority job (processed first)
-await planLlama.send(
+await planLlama.publish(
   "urgent-notification",
   { message: "System alert!" },
   { priority: 10 }
 );
 
 // Low priority job
-await planLlama.send("cleanup-logs", { olderThan: "30 days" }, { priority: -10 });
+await planLlama.publish("cleanup-logs", { olderThan: "30 days" }, { priority: -10 });
 ```
 
 ## Monitoring Jobs
@@ -218,7 +246,7 @@ console.log(counts); // { waiting: 5, active: 2, completed: 100, failed: 3 }
 
 ```typescript
 // Process multiple related jobs as a batch
-const batchId = await planLlama.sendBatch([
+const batchId = await planLlama.publishBatch([
   { name: "resize-image", data: { imageId: 1, size: "thumbnail" } },
   { name: "resize-image", data: { imageId: 1, size: "medium" } },
   { name: "resize-image", data: { imageId: 1, size: "large" } },
@@ -232,7 +260,7 @@ await planLlama.waitForBatch(batchId);
 
 ```typescript
 // Use custom job ID to prevent duplicates
-await planLlama.send(
+await planLlama.publish(
   "user-welcome-email",
   { userId: 123 },
   {
@@ -246,7 +274,7 @@ await planLlama.send(
 
 ```typescript
 try {
-  await planLlama.send("risky-operation", { data: "test" });
+  await planLlama.publish("risky-operation", { data: "test" });
 } catch (error) {
   if (error.code === "RATE_LIMIT_EXCEEDED") {
     console.log("Rate limit exceeded, try again later");
@@ -305,18 +333,19 @@ interface WorkOptions {
 
 ## Examples
 
-Check out the [examples directory](./examples) for more detailed usage examples:
+Check out the [examples directory](./examples) for more detailed usage examples including:
 
-- [Basic job processing](./examples/basic.js)
-- [Email queue](./examples/email-queue.js)
-- [Cron jobs](./examples/cron-jobs.js)
-- [Image processing pipeline](./examples/image-processing.js)
+- Consumer/worker patterns
+- Cron job scheduling
+- Performance testing
+- Publisher/consumer workflows
+- Batch job processing
+- Workflow orchestration
 
 ## Support
 
-- Documentation: [docs.planLlama.dev](https://docs.planLlama.dev)
-- Issues: [GitHub Issues](https://github.com/your-org/planLlama/issues)
-- Community: [Discord](https://discord.gg/planLlama)
+- Repository: [GitHub](https://github.com/BaudehloBiz/planllama-js)
+- Issues: [GitHub Issues](https://github.com/BaudehloBiz/planllama-js/issues)
 
 ## License
 

@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
+// Import built-in Node.js modules - will be tree-shaken or handled by bundlers in browser builds
+import * as nodeEvents from "node:events";
+import * as nodeUtil from "node:util";
+import * as nodeFsPromises from "node:fs/promises";
 
 // Browser-compatible logging
 // Use `as any` to safely check for browser environment
@@ -27,10 +31,10 @@ if (isBrowser) {
   };
 } else {
   // Node.js: use debuglog
-  // Dynamic import to avoid bundler issues
+  // Use imported module instead of dynamic require for ESM compatibility
   let debuglogFn: any;
   try {
-    debuglogFn = eval('require("node:util")').debuglog;
+    debuglogFn = nodeUtil.debuglog;
   } catch {
     debuglogFn = () => () => {}; // noop fallback
   }
@@ -93,7 +97,8 @@ if (isBrowser) {
     }
   };
 } else {
-  EventEmitter = eval('require("node:events")').EventEmitter;
+  // Node.js: use built-in EventEmitter
+  EventEmitter = nodeEvents.EventEmitter;
 }
 
 // Browser-compatible readFile
@@ -112,7 +117,7 @@ if (isBrowser) {
     throw new Error(`File reading not supported in browser: ${path}`);
   };
 } else {
-  readFile = eval('require("node:fs/promises")').readFile;
+  readFile = nodeFsPromises.readFile;
 }
 
 export interface PlanLlamaOptions {
@@ -197,6 +202,8 @@ interface HandlerInfo {
   options?: WorkOptions;
 }
 
+const defaultUrl = "https://api.planllama.io";
+
 export class PlanLlama extends EventEmitter {
   private apiToken: string;
   private serverUrl: string;
@@ -217,8 +224,7 @@ export class PlanLlama extends EventEmitter {
         throw new Error("Customer token is required");
       }
       this.apiToken = apiTokenOrOptions;
-      this.serverUrl =
-        process.env.PLANLLAMA_SERVER_URL || "http://localhost:3000";
+      this.serverUrl = process.env.PLANLLAMA_SERVER_URL || defaultUrl;
     } else {
       if (!apiTokenOrOptions || !apiTokenOrOptions.apiToken) {
         throw new Error("Customer options with token are required");
@@ -227,7 +233,7 @@ export class PlanLlama extends EventEmitter {
       this.serverUrl =
         apiTokenOrOptions.serverUrl ||
         process.env.PLANLLAMA_SERVER_URL ||
-        "http://localhost:3000";
+        defaultUrl;
     }
   }
 

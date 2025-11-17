@@ -1,0 +1,26 @@
+# Source files (ship dist only)
+src/
+
+# Tests
+tests/
+coverage/
+*.test.ts
+*.spec.ts
+
+# Development files
+examples/
+.github/
+.git/
+.gitignore
+
+# Config files
+*.config.*
+tsconfig*.json
+eslint.config.*
+jest.config.*
+
+# Misc
+node_modules/
+.DS_Store
+*.log
+*.tgz

@@ -1,19 +1,42 @@
 {
   "name": "planllama",
   "version": "1.0.0",
-  "description": "A simple and powerful cloud based job scheduler for Node.js applications without requiring a database connection",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "A simple and powerful cloud-based job scheduler for Node.js applications. Schedule jobs with cron expressions, process background tasks, and manage worker queues without requiring a database connection.",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "PROTOCOL.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:cjs && npm run build:esm",
+    "build:cjs": "tsc",
+    "build:esm": "tsc -p tsconfig.esm.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
     "dev": "tsc --watch",
-    "example": "npm run build && node dist/example.js",
+    "example": "npm run build && node dist/cjs/example.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:ci": "jest --coverage --watchAll=false"
+    "test:ci": "jest --coverage --watchAll=false",
+    "prepublishOnly": "npm run test && npm run build"
   },
   "keywords": [
     "jobs",
@@ -21,10 +44,32 @@
     "scheduler",
     "background",
     "tasks",
-    "socket.io"
+    "socket.io",
+    "cron",
+    "worker",
+    "distributed",
+    "cloud",
+    "serverless",
+    "job-queue",
+    "websocket",
+    "realtime",
+    "job-scheduler",
+    "background-jobs",
+    "task-queue"
   ],
-  "author": "",
+  "author": "PlanLlama Team",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BaudehloBiz/planllama-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BaudehloBiz/planllama-js/issues"
+  },
+  "homepage": "https://github.com/BaudehloBiz/planllama-js#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "type": "commonjs",
   "devDependencies": {
     "@eslint/js": "^9.37.0",
