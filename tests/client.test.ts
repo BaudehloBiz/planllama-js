@@ -107,7 +107,7 @@ describe("PlanLlama Connection Management", () => {
 
     await connectPromise;
 
-    expect(io).toHaveBeenCalledWith("http://localhost:3000", {
+    expect(io).toHaveBeenCalledWith("https://api.planllama.io", {
       path: "/ws",
       auth: { apiToken: "test-token" },
       transports: ["websocket", "polling"],
