@@ -8,12 +8,18 @@ A simple and powerful job scheduler for Node.js applications. PlanLlama provides
 npm install planllama
 ```
 
-## Quick Start
+## Getting Started
+
+### 1. Get Your API Token
+
+Sign up at [https://planllama.io](https://planllama.io) to get your API token. You'll find it in your project settings dashboard.
+
+### 2. Quick Start
 
 ```typescript
 import { PlanLlama } from "planllama";
 
-// Initialize with your api token
+// Initialize with your api token from https://planllama.io
 const planLlama = new PlanLlama("your-api-token");
 
 // Start the job scheduler
