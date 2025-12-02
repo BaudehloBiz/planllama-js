@@ -1,33 +1,35 @@
 // Mock for socket.io-client
 import { EventEmitter } from 'node:events'
+import type { Mock } from 'vitest'
+import { vi } from 'vitest'
 
 export interface MockSocket extends EventEmitter {
   connected: boolean
   disconnected: boolean
-  emit: jest.Mock
-  on: jest.Mock
-  off: jest.Mock
-  disconnect: jest.Mock
-  connect: jest.Mock
+  emit: Mock
+  on: Mock
+  off: Mock
+  disconnect: Mock
+  connect: Mock
 }
 
 export class MockSocketInstance extends EventEmitter implements MockSocket {
   connected = false
   disconnected = true
-  emit = jest.fn()
-  on = jest.fn()
-  off = jest.fn()
-  disconnect = jest.fn()
-  connect = jest.fn()
+  emit = vi.fn()
+  on = vi.fn()
+  off = vi.fn()
+  disconnect = vi.fn()
+  connect = vi.fn()
 
   constructor() {
     super()
-    // Override EventEmitter methods with jest mocks that call the original
-    this.on = jest.fn().mockImplementation(super.on.bind(this))
-    this.off = jest.fn().mockImplementation(super.off.bind(this))
+    // Override EventEmitter methods with vitest mocks that call the original
+    this.on = vi.fn().mockImplementation(super.on.bind(this))
+    this.off = vi.fn().mockImplementation(super.off.bind(this))
 
     // For emit, we need special handling for socket.io emit pattern with callbacks
-    this.emit = jest.fn().mockImplementation((event: string, ...args: unknown[]) => {
+    this.emit = vi.fn().mockImplementation((event: string, ...args: unknown[]) => {
       // If this is a client->server emit (not an event emission), don't call super.emit
       if (this.isClientServerEvent(event)) {
         return true // socket.io emit returns true
@@ -37,7 +39,7 @@ export class MockSocketInstance extends EventEmitter implements MockSocket {
     })
 
     // Override disconnect to trigger mockDisconnect
-    this.disconnect = jest.fn().mockImplementation(() => {
+    this.disconnect = vi.fn().mockImplementation(() => {
       this.mockDisconnect('client disconnect')
     })
   }
@@ -124,8 +126,8 @@ export class MockSocketInstance extends EventEmitter implements MockSocket {
 
 export const mockSocket = new MockSocketInstance()
 
-export const io = jest.fn().mockReturnValue(mockSocket)
-export const connect = jest.fn().mockReturnValue(mockSocket)
+export const io = vi.fn().mockReturnValue(mockSocket)
+export const connect = vi.fn().mockReturnValue(mockSocket)
 
 // Mock the Manager and Socket classes as well
 export class Manager {}

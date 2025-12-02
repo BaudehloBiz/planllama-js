@@ -1,10 +1,11 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Job, JobOptions, PlanLlamaOptions, WorkOptions } from '../src/client'
 import { PlanLlama } from '../src/client'
 import { io, mockSocket } from './__mocks__/socket.io-client'
 
 // Reset mocks before each test
 beforeEach(() => {
-  jest.clearAllMocks()
+  vi.clearAllMocks()
   mockSocket.removeAllListeners()
   mockSocket.connected = false
   mockSocket.disconnected = true
@@ -23,9 +24,8 @@ beforeEach(() => {
   mockSocket.off.mockImplementation((event: string, handler?: (...args: unknown[]) => void) => {
     if (handler) {
       return mockSocket.removeListener(event, handler)
-    } else {
-      return mockSocket.removeAllListeners(event)
     }
+    return mockSocket.removeAllListeners(event)
   })
 })
 
@@ -78,14 +78,13 @@ describe('PlanLlama Connection Management', () => {
     if (planLlama) {
       try {
         await planLlama.stop()
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (_error) {
         // Ignore cleanup errors
       }
     }
     // Force cleanup of any remaining timers
-    jest.clearAllTimers()
-    jest.useRealTimers()
+    vi.clearAllTimers()
+    vi.useRealTimers()
   })
 
   it('should connect to server successfully', async () => {
@@ -134,7 +133,7 @@ describe('PlanLlama Connection Management', () => {
     await mockSocket.mockConnect()
     await connectPromise
 
-    const errorHandler = jest.fn()
+    const errorHandler = vi.fn()
     planLlama.on('error', errorHandler)
 
     // Simulate server disconnect
@@ -277,7 +276,7 @@ describe('PlanLlama Work Registration', () => {
   })
 
   it('should register worker with handler only', () => {
-    const handler = jest.fn().mockResolvedValue('result')
+    const handler = vi.fn().mockResolvedValue('result')
 
     planLlama.work('test-job', handler)
 
@@ -288,7 +287,7 @@ describe('PlanLlama Work Registration', () => {
   })
 
   it('should register worker with options and handler', () => {
-    const handler = jest.fn().mockResolvedValue('result')
+    const handler = vi.fn().mockResolvedValue('result')
     const options: WorkOptions = { expireInSeconds: 120 }
 
     planLlama.work('test-job', options, handler)
@@ -309,8 +308,8 @@ describe('PlanLlama Work Registration', () => {
   })
 
   it('should process incoming work request successfully', async () => {
-    const handler = jest.fn().mockResolvedValue({ success: true })
-    const completedHandler = jest.fn()
+    const handler = vi.fn().mockResolvedValue({ success: true })
+    const completedHandler = vi.fn()
 
     planLlama.work('test-job', handler)
     planLlama.on('completed', completedHandler)
@@ -346,8 +345,8 @@ describe('PlanLlama Work Registration', () => {
   })
 
   it('should handle work request failure', async () => {
-    const handler = jest.fn().mockRejectedValue(new Error('Processing failed'))
-    const failedHandler = jest.fn()
+    const handler = vi.fn().mockRejectedValue(new Error('Processing failed'))
+    const failedHandler = vi.fn()
 
     planLlama.work('test-job', handler)
     planLlama.on('failed', failedHandler)
@@ -363,7 +362,7 @@ describe('PlanLlama Work Registration', () => {
       expireInSeconds: 1,
     }
 
-    const mockCallback = jest.fn()
+    const mockCallback = vi.fn()
     // Simulate incoming work request
     mockSocket.mockServerEvent('work_request', mockJob, mockCallback)
 
@@ -550,7 +549,7 @@ describe('PlanLlama Event Handling', () => {
   })
 
   it('should emit retrying event', () => {
-    const retryingHandler = jest.fn()
+    const retryingHandler = vi.fn()
     planLlama.on('retrying', retryingHandler)
 
     const mockJob: Job = {
@@ -570,7 +569,7 @@ describe('PlanLlama Event Handling', () => {
   })
 
   it('should emit expired event', () => {
-    const expiredHandler = jest.fn()
+    const expiredHandler = vi.fn()
     planLlama.on('expired', expiredHandler)
 
     const mockJob: Job = {
@@ -590,7 +589,7 @@ describe('PlanLlama Event Handling', () => {
   })
 
   it('should emit cancelled event', () => {
-    const cancelledHandler = jest.fn()
+    const cancelledHandler = vi.fn()
     planLlama.on('cancelled', cancelledHandler)
 
     const mockJob: Job = {
@@ -610,7 +609,7 @@ describe('PlanLlama Event Handling', () => {
   })
 
   it('should emit error event on socket error', () => {
-    const errorHandler = jest.fn()
+    const errorHandler = vi.fn()
     planLlama.on('error', errorHandler)
 
     const error = new Error('Socket error')

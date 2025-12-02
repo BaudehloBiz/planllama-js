@@ -1,11 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Job, StepResult, Steps } from '../src/client'
 import { PlanLlama } from '../src/client'
 import { mockSocket } from './__mocks__/socket.io-client'
 
 // Reset mocks before each test
 beforeEach(() => {
-  jest.clearAllMocks()
+  vi.clearAllMocks()
   mockSocket.removeAllListeners()
   mockSocket.connected = false
   mockSocket.disconnected = true
@@ -45,13 +45,12 @@ describe('PlanLlama Workflow Tests', () => {
     if (planLlama) {
       try {
         await planLlama.stop()
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (_error) {
         // Ignore cleanup errors
       }
     }
-    jest.clearAllTimers()
-    jest.useRealTimers()
+    vi.clearAllTimers()
+    vi.useRealTimers()
   })
 
   describe('Workflow Definition', () => {
@@ -133,7 +132,7 @@ describe('PlanLlama Workflow Tests', () => {
         expireInSeconds: 900,
       }
 
-      const mockCallback = jest.fn()
+      const mockCallback = vi.fn()
 
       // Mock fetch_step_results to return empty results
       mockSocket.emit.mockImplementation((event: string, _data: any, callback?: any) => {
@@ -178,7 +177,7 @@ describe('PlanLlama Workflow Tests', () => {
         expireInSeconds: 900,
       }
 
-      const mockCallback = jest.fn()
+      const mockCallback = vi.fn()
 
       mockSocket.emit.mockImplementation((event: string, _data: any, callback?: any) => {
         if (event === 'fetch_step_results') {
@@ -229,7 +228,7 @@ describe('PlanLlama Workflow Tests', () => {
         expireInSeconds: 900,
       }
 
-      const mockCallback = jest.fn()
+      const mockCallback = vi.fn()
 
       mockSocket.emit.mockImplementation((event: string, _data: any, callback?: any) => {
         if (event === 'fetch_step_results') {
@@ -290,7 +289,7 @@ describe('PlanLlama Workflow Tests', () => {
         expireInSeconds: 900,
       }
 
-      const mockCallback = jest.fn((response) => {
+      const mockCallback = vi.fn((response) => {
         expect(response.status).toBe('ok')
         expect(response.result).toBe('result1')
       })
@@ -331,7 +330,7 @@ describe('PlanLlama Workflow Tests', () => {
         expireInSeconds: 900,
       }
 
-      const mockCallback = jest.fn()
+      const mockCallback = vi.fn()
 
       mockSocket.mockServerEvent('work_request', mockJob, mockCallback)
 
@@ -384,7 +383,7 @@ describe('PlanLlama Workflow Tests', () => {
         expireInSeconds: 900,
       }
 
-      const mockCallback = jest.fn()
+      const mockCallback = vi.fn()
 
       mockSocket.mockServerEvent('work_request', mockJob, mockCallback)
 

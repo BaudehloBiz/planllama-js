@@ -7,13 +7,15 @@
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
     "module": "commonjs",
-    "target": "esnext",
-    "lib": ["esnext"],
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "types": ["node"],
+    "moduleResolution": "node",
     // Other Outputs
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
+    "downlevelIteration": true,
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,

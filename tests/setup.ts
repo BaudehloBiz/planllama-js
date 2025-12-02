@@ -1,7 +1,5 @@
 // Global test setup
-
-// Mock socket.io-client
-jest.mock('socket.io-client')
+import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 
 // Store original console methods
 const originalConsoleError = console.error
@@ -10,9 +8,9 @@ const originalConsoleLog = console.log
 
 beforeAll(() => {
   // Suppress console methods during tests unless specifically testing them
-  console.error = jest.fn()
-  console.warn = jest.fn()
-  console.log = jest.fn()
+  console.error = vi.fn()
+  console.warn = vi.fn()
+  console.log = vi.fn()
 })
 
 afterAll(() => {
@@ -22,11 +20,8 @@ afterAll(() => {
   console.log = originalConsoleLog
 })
 
-// Increase timeout for slow operations
-jest.setTimeout(30000)
-
 // Clean up after each test
 afterEach(() => {
-  jest.clearAllTimers()
-  jest.useRealTimers()
+  vi.clearAllTimers()
+  vi.useRealTimers()
 })

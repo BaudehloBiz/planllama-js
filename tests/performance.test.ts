@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Job } from '../src/client'
 import { PlanLlama } from '../src/client'
 import { mockSocket } from './__mocks__/socket.io-client'
@@ -6,7 +7,7 @@ describe('PlanLlama Performance Tests', () => {
   let planLlama: PlanLlama
 
   beforeEach(async () => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockSocket.removeAllListeners()
     mockSocket.connected = false
     mockSocket.disconnected = true

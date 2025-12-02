@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Job } from '../src/client'
 import { PlanLlama } from '../src/client'
 import { mockSocket } from './__mocks__/socket.io-client'
@@ -6,7 +7,7 @@ describe('PlanLlama Error Handling and Edge Cases', () => {
   let planLlama: PlanLlama
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     mockSocket.removeAllListeners()
     mockSocket.connected = false
     mockSocket.disconnected = true
@@ -25,9 +26,8 @@ describe('PlanLlama Error Handling and Edge Cases', () => {
     mockSocket.off.mockImplementation((event: string, handler?: (...args: unknown[]) => void) => {
       if (handler) {
         return mockSocket.removeListener(event, handler)
-      } else {
-        return mockSocket.removeAllListeners(event)
       }
+      return mockSocket.removeAllListeners(event)
     })
   })
 
@@ -207,7 +207,7 @@ describe('PlanLlama Error Handling and Edge Cases', () => {
         expireInSeconds: 1,
       }
 
-      const mockCallback = jest.fn()
+      const mockCallback = vi.fn()
 
       mockSocket.mockServerEvent('work_request', mockJob, mockCallback)
 
@@ -351,7 +351,7 @@ describe('PlanLlama Error Handling and Edge Cases', () => {
     })
 
     it('should handle event listener that throws errors', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation()
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
       planLlama.on('completed', () => {
         throw new Error('Event listener error')
